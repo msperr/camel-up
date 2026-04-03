@@ -53,11 +53,12 @@ impl State {
             None => panic!("camel {:?} not found in state.data", camel),
         };
 
-        let new_field = field + steps;
-        if new_field == field {
-            // no-op
-            return self.clone();
-        }
+        let new_field = field.checked_add(steps).unwrap_or_else(|| {
+            panic!(
+                "moving camel {:?} from field {} by {} steps overflows i32",
+                camel, field, steps
+            )
+        });
 
         // Clone map and perform the mutation on the clone
         let mut map = self.data.clone();
