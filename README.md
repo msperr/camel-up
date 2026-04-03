@@ -4,7 +4,8 @@ camel-cup
 A small Rust library implementing a minimal model for a "camel cup" game:
 - Camel enum (WHITE, YELLOW, ORANGE, GREEN, BLUE)
 - State struct with a BTreeMap-based field layout and move logic
-- Integration tests exercising move semantics
+- Combinatorics utilities: Permutations and Product iterators
+- Integration tests exercising combinatorics and state move semantics
 
 Quickstart / Prerequisites
 --------------------------
@@ -17,7 +18,9 @@ Build / Run / Test
 ------------------
 - Build: `cargo build`
 - Run all tests: `cargo test`
-- Run a single integration test file: `cargo test --test move_camel`
+- Run a single integration test file:
+  - `cargo test --test combinatorics`
+  - `cargo test --test state`
 - Run a single test by name (substring match): `cargo test <test_name>`
 - Run tests verbosely / show output: `cargo test -- --nocapture`
 
@@ -34,8 +37,10 @@ Repository Layout
   - src/
     - lib.rs
     - state.rs
+    - combinatorics.rs
   - tests/
-    - move_camel.rs
+    - combinatorics.rs
+    - state.rs
 - AGENTS.md - contributor & agent guidance
 
 Contributing
