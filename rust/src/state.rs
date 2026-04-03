@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 /// Camel colors
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Camel {
     WHITE,
     YELLOW,
@@ -80,6 +80,55 @@ impl State {
         dest_vec.extend(tail);
 
         State { data: map }
+    }
+
+    /// Apply a sequence of moves. Each tuple is (camel, steps).
+    /// Moves are applied sequentially in order.
+    pub fn move_multiple_camels<I>(&self, combinations: I) -> Self
+    where
+        I: IntoIterator<Item = (Camel, i32)>,
+    {
+        let mut state = self.clone();
+        for (camel, steps) in combinations.into_iter() {
+            state = state.move_camel(camel, steps);
+        }
+        state
+    }
+
+    /// Tally outcomes by running all permutations of camels and all combinations of dice
+    /// choices = [1,2,3] repeated `num_camels` times. Returns a map from Camel -> counts per position.
+    pub fn tally_outcomes(&self) -> std::collections::BTreeMap<Camel, Vec<usize>> {
+        use crate::combinatorics::{Permutations, Product};
+
+        let camel_list = vec![
+            Camel::WHITE,
+            Camel::YELLOW,
+            Camel::ORANGE,
+            Camel::GREEN,
+            Camel::BLUE,
+        ];
+        let num_camels = camel_list.len();
+        let choices = vec![1_i32, 2, 3];
+
+        let mut counts = std::collections::BTreeMap::new();
+        for &c in &camel_list {
+            counts.insert(c, vec![0usize; num_camels]);
+        }
+
+        for perm in Permutations::new(camel_list.clone()) {
+            for comb in Product::new(choices.clone(), num_camels) {
+                let moves: Vec<(Camel, i32)> = perm.iter().cloned().zip(comb.into_iter()).collect();
+                let result = self.move_multiple_camels(moves.into_iter());
+                let order = result.order();
+                for (pos, &camel) in order.iter().enumerate() {
+                    if let Some(v) = counts.get_mut(&camel) {
+                        v[pos] += 1;
+                    }
+                }
+            }
+        }
+
+        counts
     }
 
     /// Return all camels flattened in order by the map's key.
