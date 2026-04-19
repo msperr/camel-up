@@ -134,10 +134,12 @@ impl State {
         // Look up the tile type from the original State (self.data).
         match self.data.get(&desert_field) {
             Some(Field::Desert(DesertTile::Oasis)) => {
-                let forward = desert_field.checked_add(1).unwrap_or_else(|| panic!(
-                    "moving camel from desert {} by oasis forward would overflow",
-                    desert_field
-                ));
+                let forward = desert_field.checked_add(1).unwrap_or_else(|| {
+                    panic!(
+                        "moving camel from desert {} by oasis forward would overflow",
+                        desert_field
+                    )
+                });
                 if let Some(Field::Desert(_)) = self.data.get(&forward) {
                     panic!(
                         "precondition violated: desert at {} adjacent to desert at {}",
@@ -161,10 +163,12 @@ impl State {
                 Some(desert_field)
             }
             Some(Field::Desert(DesertTile::Mirage)) => {
-                let back = desert_field.checked_sub(1).unwrap_or_else(|| panic!(
-                    "moving camel from desert {} by mirage back would underflow",
-                    desert_field
-                ));
+                let back = desert_field.checked_sub(1).unwrap_or_else(|| {
+                    panic!(
+                        "moving camel from desert {} by mirage back would underflow",
+                        desert_field
+                    )
+                });
                 if let Some(Field::Desert(_)) = self.data.get(&back) {
                     panic!(
                         "precondition violated: desert at {} adjacent to desert at {}",
