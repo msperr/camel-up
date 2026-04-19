@@ -1,5 +1,8 @@
 use std::collections::BTreeMap;
 
+// Maximum field index (inclusive)
+const MAX_FIELD: u8 = 16;
+
 /// Camel colors
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Camel {
@@ -313,8 +316,10 @@ impl State {
         }
 
         let min_key = *self.data.keys().next().unwrap();
-        let max_key = *self.data.keys().last().unwrap();
-        let bound = std::cmp::max(max_key, 16u8);
+        if min_key > MAX_FIELD {
+            return result;
+        }
+        let bound = MAX_FIELD;
 
         for pos in min_key..=bound {
             for &tile in &[DesertTile::Oasis, DesertTile::Mirage] {
