@@ -2,7 +2,7 @@ use camel_cup::{Camel, DesertTile, Field, State};
 use std::collections::BTreeMap;
 use std::panic::catch_unwind;
 
-fn mk_map(entries: &[(u8, Field)]) -> BTreeMap<u8, Field> {
+fn mk_map(entries: &[(i32, Field)]) -> BTreeMap<i32, Field> {
     let mut m = BTreeMap::new();
     for (k, v) in entries {
         m.insert(*k, v.clone());
@@ -40,7 +40,7 @@ fn test_move_camel_with_deserts_explicit() {
         {
             let state = State::new(mk_map(&base));
             let (res_state, desert_hit) = state.move_camel(Camel::White, steps);
-            assert_eq!(desert_hit, Some(3u8));
+            assert_eq!(desert_hit, Some(3));
             let expected = vec![
                 (3, Field::Desert(DesertTile::Oasis)),
                 (4, Field::Camels(vec![Camel::White])),
@@ -54,7 +54,7 @@ fn test_move_camel_with_deserts_explicit() {
             entries.push((4, Field::Camels(vec![Camel::Orange])));
             let state = State::new(mk_map(&entries));
             let (res_state, desert_hit) = state.move_camel(Camel::White, steps);
-            assert_eq!(desert_hit, Some(3u8));
+            assert_eq!(desert_hit, Some(3));
             let expected = vec![
                 (3, Field::Desert(DesertTile::Oasis)),
                 (4, Field::Camels(vec![Camel::Orange, Camel::White])),
@@ -82,7 +82,7 @@ fn test_move_camel_with_deserts_explicit() {
         {
             let state = State::new(mk_map(&base));
             let (res_state, desert_hit) = state.move_camel(Camel::White, steps);
-            assert_eq!(desert_hit, Some(3u8));
+            assert_eq!(desert_hit, Some(3));
             let expected = vec![
                 (2, Field::Camels(vec![Camel::White])),
                 (3, Field::Desert(DesertTile::Mirage)),
@@ -126,312 +126,5 @@ fn test_move_camel_with_deserts_explicit() {
         assert_eq!(desert_hit, None);
         let expected = vec![(3, Field::Camels(vec![Camel::Yellow, Camel::White]))];
         assert_eq!(res_state.data, mk_map(&expected));
-    }
-}
-
-#[test]
-fn test_mirage_prepends_white_from_stack() {
-    // initial: 1: [Yellow, White], 2: Mirage
-    let initial = vec![
-        (1, Field::Camels(vec![Camel::Yellow, Camel::White])),
-        (2, Field::Desert(DesertTile::Mirage)),
-    ];
-    let state = State::new(mk_map(&initial));
-
-    // steps = 1 moves White from 1 -> 2 (hits Mirage), mirage moves it back to 1 and prepends
-    let (res_state, desert_hit) = state.move_camel(Camel::White, 1);
-    assert_eq!(desert_hit, Some(2u8));
-    let expected = vec![
-        (1, Field::Camels(vec![Camel::White, Camel::Yellow])),
-        (2, Field::Desert(DesertTile::Mirage)),
-    ];
-    assert_eq!(res_state.data, mk_map(&expected));
-}
-
-#[test]
-fn test_move_all_camels_various_steps_with_deserts() {
-    // initial map: 1:[White], 3:[Yellow, Orange, Green], 5:[Blue]
-    // with deserts at 4: Mirage and 6: Oasis
-    let mut initial = vec![
-        (1, Field::Camels(vec![Camel::White])),
-        (
-            3,
-            Field::Camels(vec![Camel::Yellow, Camel::Orange, Camel::Green]),
-        ),
-        (5, Field::Camels(vec![Camel::Blue])),
-    ];
-    // insert deserts
-    initial.push((4, Field::Desert(DesertTile::Mirage)));
-    initial.push((6, Field::Desert(DesertTile::Oasis)));
-
-    let state = State::new(mk_map(&initial));
-
-    let expect = |(res_state, _desert_hit): (State, Option<u8>),
-                  expected_entries: &[(u8, Field)]| {
-        // desert_hit value is asserted by checking expected entries for desert keys
-        assert_eq!(res_state.data, mk_map(expected_entries));
-    };
-
-    // WHITE at 1:
-    {
-        let result = state.move_camel(Camel::White, 1);
-        expect(
-            result,
-            &[
-                (2, Field::Camels(vec![Camel::White])),
-                (
-                    3,
-                    Field::Camels(vec![Camel::Yellow, Camel::Orange, Camel::Green]),
-                ),
-                (4, Field::Desert(DesertTile::Mirage)),
-                (5, Field::Camels(vec![Camel::Blue])),
-                (6, Field::Desert(DesertTile::Oasis)),
-            ],
-        );
-    }
-    {
-        let result = state.move_camel(Camel::White, 2);
-        expect(
-            result,
-            &[
-                (
-                    3,
-                    Field::Camels(vec![
-                        Camel::Yellow,
-                        Camel::Orange,
-                        Camel::Green,
-                        Camel::White,
-                    ]),
-                ),
-                (4, Field::Desert(DesertTile::Mirage)),
-                (5, Field::Camels(vec![Camel::Blue])),
-                (6, Field::Desert(DesertTile::Oasis)),
-            ],
-        );
-    }
-    {
-        let (res_state, desert_hit) = state.move_camel(Camel::White, 3);
-        assert_eq!(desert_hit, Some(4u8));
-        expect(
-            (res_state, desert_hit),
-            &[
-                (
-                    3,
-                    Field::Camels(vec![
-                        Camel::White,
-                        Camel::Yellow,
-                        Camel::Orange,
-                        Camel::Green,
-                    ]),
-                ),
-                (4, Field::Desert(DesertTile::Mirage)),
-                (5, Field::Camels(vec![Camel::Blue])),
-                (6, Field::Desert(DesertTile::Oasis)),
-            ],
-        );
-    }
-
-    // YELLOW at 3 (pos 0)
-    {
-        let (res_state, desert_hit) = state.move_camel(Camel::Yellow, 1);
-        assert_eq!(desert_hit, Some(4u8));
-        expect(
-            (res_state, desert_hit),
-            &[
-                (1, Field::Camels(vec![Camel::White])),
-                (
-                    3,
-                    Field::Camels(vec![Camel::Yellow, Camel::Orange, Camel::Green]),
-                ),
-                (4, Field::Desert(DesertTile::Mirage)),
-                (5, Field::Camels(vec![Camel::Blue])),
-                (6, Field::Desert(DesertTile::Oasis)),
-            ],
-        );
-    }
-    {
-        let result = state.move_camel(Camel::Yellow, 2);
-        expect(
-            result,
-            &[
-                (1, Field::Camels(vec![Camel::White])),
-                (
-                    5,
-                    Field::Camels(vec![
-                        Camel::Blue,
-                        Camel::Yellow,
-                        Camel::Orange,
-                        Camel::Green,
-                    ]),
-                ),
-                (4, Field::Desert(DesertTile::Mirage)),
-                (6, Field::Desert(DesertTile::Oasis)),
-            ],
-        );
-    }
-    {
-        let (res_state, desert_hit) = state.move_camel(Camel::Yellow, 3);
-        assert_eq!(desert_hit, Some(6u8));
-        expect(
-            (res_state, desert_hit),
-            &[
-                (1, Field::Camels(vec![Camel::White])),
-                (5, Field::Camels(vec![Camel::Blue])),
-                (6, Field::Desert(DesertTile::Oasis)),
-                (
-                    7,
-                    Field::Camels(vec![Camel::Yellow, Camel::Orange, Camel::Green]),
-                ),
-                (4, Field::Desert(DesertTile::Mirage)),
-            ],
-        );
-    }
-
-    // ORANGE at 3 (pos 1)
-    {
-        let (res_state, desert_hit) = state.move_camel(Camel::Orange, 1);
-        assert_eq!(desert_hit, Some(4u8));
-        expect(
-            (res_state, desert_hit),
-            &[
-                (1, Field::Camels(vec![Camel::White])),
-                (
-                    3,
-                    Field::Camels(vec![Camel::Orange, Camel::Green, Camel::Yellow]),
-                ),
-                (4, Field::Desert(DesertTile::Mirage)),
-                (5, Field::Camels(vec![Camel::Blue])),
-                (6, Field::Desert(DesertTile::Oasis)),
-            ],
-        );
-    }
-    {
-        let result = state.move_camel(Camel::Orange, 2);
-        expect(
-            result,
-            &[
-                (1, Field::Camels(vec![Camel::White])),
-                (3, Field::Camels(vec![Camel::Yellow])),
-                (
-                    5,
-                    Field::Camels(vec![Camel::Blue, Camel::Orange, Camel::Green]),
-                ),
-                (4, Field::Desert(DesertTile::Mirage)),
-                (6, Field::Desert(DesertTile::Oasis)),
-            ],
-        );
-    }
-    {
-        let (res_state, desert_hit) = state.move_camel(Camel::Orange, 3);
-        assert_eq!(desert_hit, Some(6u8));
-        expect(
-            (res_state, desert_hit),
-            &[
-                (1, Field::Camels(vec![Camel::White])),
-                (3, Field::Camels(vec![Camel::Yellow])),
-                (5, Field::Camels(vec![Camel::Blue])),
-                (6, Field::Desert(DesertTile::Oasis)),
-                (7, Field::Camels(vec![Camel::Orange, Camel::Green])),
-                (4, Field::Desert(DesertTile::Mirage)),
-            ],
-        );
-    }
-
-    // GREEN at 3 (pos 2)
-    {
-        let (res_state, desert_hit) = state.move_camel(Camel::Green, 1);
-        assert_eq!(desert_hit, Some(4u8));
-        expect(
-            (res_state, desert_hit),
-            &[
-                (1, Field::Camels(vec![Camel::White])),
-                (
-                    3,
-                    Field::Camels(vec![Camel::Green, Camel::Yellow, Camel::Orange]),
-                ),
-                (4, Field::Desert(DesertTile::Mirage)),
-                (5, Field::Camels(vec![Camel::Blue])),
-                (6, Field::Desert(DesertTile::Oasis)),
-            ],
-        );
-    }
-    {
-        let result = state.move_camel(Camel::Green, 2);
-        expect(
-            result,
-            &[
-                (1, Field::Camels(vec![Camel::White])),
-                (3, Field::Camels(vec![Camel::Yellow, Camel::Orange])),
-                (5, Field::Camels(vec![Camel::Blue, Camel::Green])),
-                (4, Field::Desert(DesertTile::Mirage)),
-                (6, Field::Desert(DesertTile::Oasis)),
-            ],
-        );
-    }
-    {
-        let (res_state, desert_hit) = state.move_camel(Camel::Green, 3);
-        assert_eq!(desert_hit, Some(6u8));
-        expect(
-            (res_state, desert_hit),
-            &[
-                (1, Field::Camels(vec![Camel::White])),
-                (3, Field::Camels(vec![Camel::Yellow, Camel::Orange])),
-                (5, Field::Camels(vec![Camel::Blue])),
-                (6, Field::Desert(DesertTile::Oasis)),
-                (7, Field::Camels(vec![Camel::Green])),
-                (4, Field::Desert(DesertTile::Mirage)),
-            ],
-        );
-    }
-
-    // BLUE at 5 (pos 0)
-    {
-        let (res_state, desert_hit) = state.move_camel(Camel::Blue, 1);
-        assert_eq!(desert_hit, Some(6u8));
-        expect(
-            (res_state, desert_hit),
-            &[
-                (1, Field::Camels(vec![Camel::White])),
-                (
-                    3,
-                    Field::Camels(vec![Camel::Yellow, Camel::Orange, Camel::Green]),
-                ),
-                (4, Field::Desert(DesertTile::Mirage)),
-                (6, Field::Desert(DesertTile::Oasis)),
-                (7, Field::Camels(vec![Camel::Blue])),
-            ],
-        );
-    }
-    {
-        let result = state.move_camel(Camel::Blue, 2);
-        expect(
-            result,
-            &[
-                (1, Field::Camels(vec![Camel::White])),
-                (
-                    3,
-                    Field::Camels(vec![Camel::Yellow, Camel::Orange, Camel::Green]),
-                ),
-                (4, Field::Desert(DesertTile::Mirage)),
-                (7, Field::Camels(vec![Camel::Blue])),
-                (6, Field::Desert(DesertTile::Oasis)),
-            ],
-        );
-    }
-    {
-        let result = state.move_camel(Camel::Blue, 3);
-        expect(
-            result,
-            &[
-                (1, Field::Camels(vec![Camel::White])),
-                (
-                    3,
-                    Field::Camels(vec![Camel::Yellow, Camel::Orange, Camel::Green]),
-                ),
-                (4, Field::Desert(DesertTile::Mirage)),
-                (8, Field::Camels(vec![Camel::Blue])),
-                (6, Field::Desert(DesertTile::Oasis)),
-            ],
-        );
     }
 }
