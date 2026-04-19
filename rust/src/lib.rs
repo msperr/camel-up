@@ -2,4 +2,5 @@ pub mod combinatorics;
 pub mod state;
 
 pub use combinatorics::{Permutations, Product};
-pub use state::{Camel, DesertTile, Field, State};
+// Public API renamed to better reflect game terminology (breaking change).
+pub use state::{Camel, DesertTile, Space, State};

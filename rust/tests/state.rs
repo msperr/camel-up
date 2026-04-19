@@ -1,10 +1,10 @@
-use camel_cup::{Camel, Field, State};
+use camel_up::{Camel, Space, State};
 use std::collections::BTreeMap;
 
-fn mk_map(entries: &[(u8, Vec<Camel>)]) -> BTreeMap<u8, Field> {
+fn mk_map(entries: &[(u8, Vec<Camel>)]) -> BTreeMap<u8, Space> {
     let mut m = BTreeMap::new();
     for (k, v) in entries {
-        m.insert(*k, Field::Camels(v.clone()));
+        m.insert(*k, Space::Camels(v.clone()));
     }
     m
 }
@@ -26,7 +26,7 @@ fn test_move_white_combinations() {
     // Helper to run a single scenario: initial map entries, expected map entries
     let run = |initial_entries: &[(u8, Vec<Camel>)], expected_entries: &[(u8, Vec<Camel>)]| {
         let state = State::new(mk_map(initial_entries));
-        let (res_state, desert_hit) = state.move_camel(Camel::White, steps);
+        let (res_state, desert_hit) = state.move_unit(Camel::White, steps);
         assert_eq!(desert_hit, None);
         let expected = mk_map(expected_entries);
         assert_eq!(res_state.data, expected);
@@ -107,7 +107,7 @@ fn test_move_all_camels_various_steps() {
 
     // WHITE at 1:
     {
-        let (res, dh) = state.move_camel(Camel::White, 1);
+        let (res, dh) = state.move_unit(Camel::White, 1);
         assert_eq!(dh, None);
         expect(
             res,
@@ -119,7 +119,7 @@ fn test_move_all_camels_various_steps() {
         );
     }
     {
-        let (res, dh) = state.move_camel(Camel::White, 2);
+        let (res, dh) = state.move_unit(Camel::White, 2);
         assert_eq!(dh, None);
         expect(
             res,
@@ -133,7 +133,7 @@ fn test_move_all_camels_various_steps() {
         );
     }
     {
-        let (res, dh) = state.move_camel(Camel::White, 3);
+        let (res, dh) = state.move_unit(Camel::White, 3);
         assert_eq!(dh, None);
         expect(
             res,
@@ -147,7 +147,7 @@ fn test_move_all_camels_various_steps() {
 
     // YELLOW at 3 (pos 0)
     {
-        let (res, dh) = state.move_camel(Camel::Yellow, 1);
+        let (res, dh) = state.move_unit(Camel::Yellow, 1);
         assert_eq!(dh, None);
         expect(
             res,
@@ -159,7 +159,7 @@ fn test_move_all_camels_various_steps() {
         );
     }
     {
-        let (res, dh) = state.move_camel(Camel::Yellow, 2);
+        let (res, dh) = state.move_unit(Camel::Yellow, 2);
         assert_eq!(dh, None);
         expect(
             res,
@@ -173,7 +173,7 @@ fn test_move_all_camels_various_steps() {
         );
     }
     {
-        let (res, dh) = state.move_camel(Camel::Yellow, 3);
+        let (res, dh) = state.move_unit(Camel::Yellow, 3);
         assert_eq!(dh, None);
         expect(
             res,
@@ -187,7 +187,7 @@ fn test_move_all_camels_various_steps() {
 
     // ORANGE at 3 (pos 1)
     {
-        let (res, dh) = state.move_camel(Camel::Orange, 1);
+        let (res, dh) = state.move_unit(Camel::Orange, 1);
         assert_eq!(dh, None);
         expect(
             res,
@@ -200,7 +200,7 @@ fn test_move_all_camels_various_steps() {
         );
     }
     {
-        let (res, dh) = state.move_camel(Camel::Orange, 2);
+        let (res, dh) = state.move_unit(Camel::Orange, 2);
         assert_eq!(dh, None);
         expect(
             res,
@@ -212,7 +212,7 @@ fn test_move_all_camels_various_steps() {
         );
     }
     {
-        let (res, dh) = state.move_camel(Camel::Orange, 3);
+        let (res, dh) = state.move_unit(Camel::Orange, 3);
         assert_eq!(dh, None);
         expect(
             res,
@@ -227,7 +227,7 @@ fn test_move_all_camels_various_steps() {
 
     // GREEN at 3 (pos 2)
     {
-        let (res, dh) = state.move_camel(Camel::Green, 1);
+        let (res, dh) = state.move_unit(Camel::Green, 1);
         assert_eq!(dh, None);
         expect(
             res,
@@ -240,7 +240,7 @@ fn test_move_all_camels_various_steps() {
         );
     }
     {
-        let (res, dh) = state.move_camel(Camel::Green, 2);
+        let (res, dh) = state.move_unit(Camel::Green, 2);
         assert_eq!(dh, None);
         expect(
             res,
@@ -252,7 +252,7 @@ fn test_move_all_camels_various_steps() {
         );
     }
     {
-        let (res, dh) = state.move_camel(Camel::Green, 3);
+        let (res, dh) = state.move_unit(Camel::Green, 3);
         assert_eq!(dh, None);
         expect(
             res,
@@ -267,7 +267,7 @@ fn test_move_all_camels_various_steps() {
 
     // BLUE at 5 (pos 0)
     {
-        let (res, dh) = state.move_camel(Camel::Blue, 1);
+        let (res, dh) = state.move_unit(Camel::Blue, 1);
         assert_eq!(dh, None);
         expect(
             res,
@@ -279,7 +279,7 @@ fn test_move_all_camels_various_steps() {
         );
     }
     {
-        let (res, dh) = state.move_camel(Camel::Blue, 2);
+        let (res, dh) = state.move_unit(Camel::Blue, 2);
         assert_eq!(dh, None);
         expect(
             res,
@@ -291,7 +291,7 @@ fn test_move_all_camels_various_steps() {
         );
     }
     {
-        let (res, dh) = state.move_camel(Camel::Blue, 3);
+        let (res, dh) = state.move_unit(Camel::Blue, 3);
         assert_eq!(dh, None);
         expect(
             res,

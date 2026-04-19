@@ -1,8 +1,8 @@
 [package]
-name = "camel_cup"
+name = "camel-up"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "camel_cup"
+name = "camel_up"
 path = "src/lib.rs"

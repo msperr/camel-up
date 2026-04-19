@@ -3,120 +3,79 @@ AGENTS
 
 Purpose
 -------
-This file documents how agentic coding assistants should operate inside this repository (camel-cup).
-It includes build, lint, and test commands, conventions for code style, and operational rules for modifying the codebase.
+Short, high-signal instructions for automated agents working in this repository.
+Only include facts an agent would likely miss (non-obvious commands, API renames,
+repo vs crate name mismatches, and safety steps for rewriting history).
 
-Quick commands
---------------
-- Build library: `cargo build`
-- Run tests: `cargo test`
-- Run a single integration test file: `cargo test --test move_camel`
-- Run a single unit or doc test by name: `cargo test <test_name>` (use exact name or a substring)
-- Run tests with verbose output: `cargo test -- --nocapture`
-- Check formatting: `rustfmt --edition 2021 --check $(git ls-files "**/*.rs")` or simply `cargo fmt -- --check`
-- Fix formatting: `cargo fmt`
- - Static analysis / clippy: install via `rustup component add clippy` then run `cargo clippy -- -D warnings` (treat warnings as errors). Recommended to run this as part of pre-commit checks or in CI.
-
-Project layout
---------------
-- rust/: the Rust crate root with Cargo.toml and src/
-  - src/state.rs: primary implementation (Camel enum and State)
-  - src/lib.rs: exposes the public API
-  - tests/: integration tests (move_camel.rs)
-
-Key public API notes
---------------------
-- Camel enum: variants White, Yellow, Orange, Green, Blue (derives Ord/Hash so usable in maps).
-- State:
-  - `new(data: BTreeMap<u8, Field>) -> State`
-  - `move_camel(&self, camel: Camel, steps: u8) -> (State, Option<u8>)` — Panics if steps == 0, camel not found, camel appears multiple times, or precondition violations (e.g. adjacent deserts).
-  - `move_multiple_camels(&self, combinations: impl IntoIterator<Item=(Camel,u8)>) -> (State, BTreeMap<u8, usize>)` — Applies moves sequentially and returns aggregated desert hit counts per field.
-  - `simulate_outcomes(&self) -> (BTreeMap<Camel, Vec<usize>>, BTreeMap<u8, usize>)` — Runs exhaustive permutations and dice choices, returning camel position counts and desert-hit totals per field.
-  - `evaluate_desert_placements(&self) -> BTreeMap<u8, BTreeMap<DesertTile, usize>>` — For each candidate field (1..=16) and each DesertTile, returns how many desert-hits would occur if that tile were placed there (feasibility checks applied).
-
-Notes:
-- Field keys and dice `steps` use `u8` (valid field keys are in range 1..=16). Arithmetic on keys uses checked_add/checked_sub to avoid wrapping.
-- DesertTile derives Ord so it can be used as a key in BTreeMap when needed.
-
-Testing notes
--------------
-- Integration tests live in `rust/tests/` and exercise the public API via `use camel_cup::{Camel, State};`.
-- To run a single integration test file: `cargo test --test <testname>` (example: `cargo test --test move_camel`).
-- To run a single test case by name: `cargo test <test_fn_name>` (partial name matching allowed).
-- Use `-- --nocapture` to see test stdout for debugging.
-
-Coding Conventions
-------------------
-The repository uses idiomatic Rust. Follow these conventions when editing or adding code:
-
-Formatting
-- Use `rustfmt` for formatting. Run `cargo fmt` before committing. CI may enforce formatting with `cargo fmt -- --check`.
-- Keep line length reasonable (80-100 chars). `rustfmt` settings are authoritative.
-
-Imports
-- Use explicit imports in module scope rather than glob imports (`use crate::module::Type` instead of `use crate::module::*`).
-- Group imports: standard library first, external crates next, local modules last.
-
-Types and Mutability
-- Prefer immutable bindings (`let`) and only use `mut` when necessary.
-- Use `BTreeMap` for maps where iteration in key order matters and `HashMap` otherwise.
-- Prefer small, Copy-able enums for lightweight values (Camel is Copy).
-
-Naming
-- Use CamelCase for types and enums: `Camel`, `State`.
-- Use UPPER_SNAKE_CASE for enum variants only when domain requires; otherwise use Rust's conventional `PascalCase` values. This project currently uses `WHITE`, `YELLOW`, etc. Keep existing names unchanged to avoid churn.
-- Use snake_case for functions and variables: `move_camel`, `new_field`, `src_vec`, `position`.
-
-Functions and APIs
-- Prefer immutable, functional updates (return new State) unless mutation is required. Current `State::move_camel` returns a new State.
-- Where an operation can fail due to invalid input, prefer non-panicking error handling (Result) for library-facing APIs. Internal scripts or tests may use panics only when invariants are violated. Current `move_camel` panics on invalid input; consider exposing a `try_move_camel` returning `Result` in future iterations.
-
-Error Handling
-- Use `Result<T, E>` with a small error enum for recoverable errors when building library functions that callers may use. For internal invariant violations or programming errors, `panic!` is acceptable but should include a descriptive message.
-- When panicking in tests or small internal helpers, include the variable values in the message for easier debugging, e.g., `panic!("camel {:?} not found", camel)`.
-
-Testing Practices
-- Prefer explicit, deterministic tests. Integration tests should exercise the public API and assert on public types/fields.
-- Keep test data explicit and avoid reproducing logic under test when asserting expected outcomes (i.e., write explicit expected results).
-- Use helper functions inside test modules for setup/teardown only; avoid moving production logic into tests.
-
-Git / Commits
-- Commit messages should be short and descriptive. Use imperative mood: "add move_camel implementation", "add integration tests for move_camel".
-- Don't commit build artifacts in rust/target/ (these are currently present locally but should be ignored by .gitignore). If needed, add or update .gitignore to exclude `rust/target/`.
-
-Agent Operational Rules
------------------------
-- Always run `cargo test` and `cargo fmt` locally before proposing Pull Requests.
-- When adding new public APIs, add unit tests and integration tests demonstrating expected behavior.
-- Make minimal, incremental changes. Prefer small, reviewable commits.
-- If you encounter ambiguous requirements, ask a concise clarifying question rather than guessing. Provide 1-2 implementation options when appropriate.
-
-Cursor / Copilot rules
+Quick Commands (exact)
 ----------------------
-- If this repository contains `.cursor` or Copilot-specific instruction files, follow them. (No such files were found.)
-- If project maintains `.github/copilot-instructions.md`, follow those instructions in addition to this file.
+# work in the Rust crate directory
+cd rust
 
-Local developer setup
----------------------
-- Install Rust via rustup: https://rustup.rs
-- Install clippy and fmt: `rustup component add clippy rustfmt`
-- Run `cargo build` to compile and `cargo test` to verify.
+# build / quick verify
+cargo check
+cargo build
 
-Examples
---------
-- Run all tests: `cargo test`
-- Run a single integration test file: `cargo test --test move_camel`
-- Run a single test case: `cargo test test_move_white_combinations`
-- Check formatting: `cargo fmt -- --check`
+# run everything
+cargo test
 
-Contacts and escalation
+# run a single integration test file (file name without .rs):
+cargo test --test desert_tiles
+
+# run a single test case (substring or exact):
+cargo test test_move_white_combinations
+
+# formatting and lint
+rustup component add rustfmt clippy
+cargo fmt --all
+cargo fmt -- --check
+cargo clippy -- -D warnings
+
+Repository layout & naming gotchas
+---------------------------------
+- Repo name: `camel-up` (filesystem root). Crate name inside Rust manifest is `camel_up` (see rust/Cargo.toml). After this change imports should use `use camel_up::{...}`.
+- Primary crate: rust/ (Cargo.toml, src/, tests/). Treat `rust/` as the workspace package.
+- Public API is exported from rust/src/lib.rs: Camel, DesertTile, Space, State.
+
+High-value API facts (verify before changing code)
+-------------------------------------------------
+- Camel enum: variants are PascalCase: `Camel::White`, `Camel::Yellow`, `Camel::Orange`, `Camel::Green`, `Camel::Blue`.
+- Field name changed to Space: enum `Space::Camels(Vec<Camel>)` and `Space::Desert(DesertTile)`.
+- API renames to keep in mind:
+  - `State::move_unit(&self, camel: Camel, steps: u8) -> (State, Option<u8>)`
+  - `State::move_multiple_units` (accepts IntoIterator of (Camel,u8))
+  - `State::simulate_outcomes()` and `State::evaluate_desert_placements()`
+
+Important invariants and behaviour
+----------------------------------
+- Keys and steps use `u8` (valid keys 1..=16). Code uses checked_add/checked_sub; watch for over/underflow and preserve u8 semantics.
+- Desert tiles: Oasis forwards the moving unit, Mirage moves it back. Precondition: deserts must not be adjacent in the direction of the effect.
+- Many functions panic on invalid input (e.g. move_unit when steps==0 or camel not found). Tests rely on these panics in places.
+
+Testing and debug tips
+----------------------
+- Integration tests live under rust/tests/*.rs. Use `cargo test --test <name>` to run one file.
+- To reproduce failing test output use `cargo test <test_name> -- --nocapture`.
+- `cargo check` is usually fast and sufficient before running full tests.
+
+Editing, commits and history rules
+--------------------------------
+- Don't commit build artifacts (rust/target/). .gitignore is present but check before committing.
+- When rebasing or force-pushing: create a safety backup branch first, e.g.
+  git -C /path/to/repo branch backup/<branch>-before-rebase <branch>
+- Use `git push --force-with-lease` when updating branches on origin to avoid clobbering others' work.
+
+Operational gotchas an agent would miss
+--------------------------------------
+- Repo != crate name: before this change many references used `use camel_cup::{...}`. Update imports to `use camel_up::{...}` after renaming Cargo.toml.
+- Tests and code expect u8 arithmetic semantics; changing types to i32 or removing checked arithmetic will break invariants/tests.
+- There used to be a worktree for branches; check `git worktree list` if branch deletion fails.
+
+If something is unclear
 -----------------------
-- If tests fail after your change, reproduce locally, run `cargo test -- --nocapture`, and include the failing test output in the issue or PR description.
-- For non-obvious behavior involving game rules, ask the repository owner for clarification.
+- Prefer reading rust/Cargo.toml and rust/src/lib.rs for the true public API. Trust code over README when they disagree.
+- If a change affects public API names (crate exports), run `cargo check` and the full `cargo test` suite before pushing.
 
-Maintenance notes
------------------
-- Keep AGENTS.md up to date when adding new tools, CI, or style rules.
-- If a linter or formatting tool is added to CI, include exact commands and required versions here.
-
-End
+Maintenance
+-----------
+- Keep this file minimal and factual. Add only repository-specific rules that an automated agent would not infer.
