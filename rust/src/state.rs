@@ -28,12 +28,12 @@ pub enum Field {
 #[derive(Clone, Debug)]
 pub struct State {
     /// Mapping from integer keys to field contents (camels or desert)
-    pub data: BTreeMap<i32, Field>,
+    pub data: BTreeMap<u8, Field>,
 }
 
 impl State {
     /// Create a new State from the provided map
-    pub fn new(data: BTreeMap<i32, Field>) -> Self {
+    pub fn new(data: BTreeMap<u8, Field>) -> Self {
         State { data }
     }
 
@@ -46,13 +46,13 @@ impl State {
     /// - `camel` is not found in `data`
     /// - `camel` appears more than once in `data`
     /// - precondition violated: if a desert is adjacent to another desert in the direction moved
-    pub fn move_camel(&self, camel: Camel, steps: i32) -> (Self, Option<i32>) {
-        if steps < 1 {
-            panic!("steps must be >= 1, got {}", steps);
+    pub fn move_camel(&self, camel: Camel, steps: u8) -> (Self, Option<u8>) {
+        if steps == 0 {
+            panic!("steps must be >= 1, got 0");
         }
 
         // Find the unique occurrence of camel: (field, position)
-        let mut found: Option<(i32, usize)> = None;
+        let mut found: Option<(u8, usize)> = None;
         for (k, field_val) in &self.data {
             if let Field::Camels(v) = field_val {
                 for (i, &c) in v.iter().enumerate() {
@@ -71,11 +71,10 @@ impl State {
             None => panic!("camel {:?} not found in state.data", camel),
         };
 
-        // Use checked_add to detect overflow when adding steps to field.
-        // This panics with a clear message if arithmetic would overflow i32.
+        // Compute destination using checked_add on u8 to preserve u8 semantics.
         let new_field = field.checked_add(steps).unwrap_or_else(|| {
             panic!(
-                "moving camel {:?} from field {} by {} steps overflows i32",
+                "moving camel {:?} from field {} by {} steps would overflow u8",
                 camel, field, steps
             )
         });
@@ -127,19 +126,20 @@ impl State {
     // and returns Some(desert_field). Uses `self.data` for the precondition checks.
     fn apply_desert_effect(
         &self,
-        map: &mut BTreeMap<i32, Field>,
-        desert_field: i32,
+        map: &mut BTreeMap<u8, Field>,
+        desert_field: u8,
         tail: Vec<Camel>,
-    ) -> Option<i32> {
+    ) -> Option<u8> {
         // Look up the tile type from the original State (self.data).
         match self.data.get(&desert_field) {
             Some(Field::Desert(DesertTile::Oasis)) => {
                 let forward = desert_field.checked_add(1).unwrap_or_else(|| {
                     panic!(
-                        "moving camel from desert {} by oasis forward would overflow",
+                        "moving camel from desert {} by oasis forward would overflow u8",
                         desert_field
                     )
                 });
+
                 if let Some(Field::Desert(_)) = self.data.get(&forward) {
                     panic!(
                         "precondition violated: desert at {} adjacent to desert at {}",
@@ -165,10 +165,11 @@ impl State {
             Some(Field::Desert(DesertTile::Mirage)) => {
                 let back = desert_field.checked_sub(1).unwrap_or_else(|| {
                     panic!(
-                        "moving camel from desert {} by mirage back would underflow",
+                        "moving camel from desert {} by mirage back would underflow u8",
                         desert_field
                     )
                 });
+
                 if let Some(Field::Desert(_)) = self.data.get(&back) {
                     panic!(
                         "precondition violated: desert at {} adjacent to desert at {}",
@@ -198,12 +199,12 @@ impl State {
         }
     }
 
-    pub fn move_multiple_camels<I>(&self, moves: I) -> (Self, BTreeMap<i32, usize>)
+    pub fn move_multiple_camels<I>(&self, moves: I) -> (Self, BTreeMap<u8, usize>)
     where
-        I: IntoIterator<Item = (Camel, i32)>,
+        I: IntoIterator<Item = (Camel, u8)>,
     {
         let mut state = self.clone();
-        let mut counts: BTreeMap<i32, usize> = BTreeMap::new();
+        let mut counts: BTreeMap<u8, usize> = BTreeMap::new();
         for (camel, steps) in moves.into_iter() {
             let (new_state, maybe_desert) = state.move_camel(camel, steps);
             if let Some(k) = maybe_desert {
@@ -244,7 +245,7 @@ impl State {
             }
         }
         let num_camels = camel_list.len();
-        let choices = vec![1_i32, 2, 3];
+        let choices: Vec<u8> = vec![1, 2, 3];
 
         let mut counts = std::collections::BTreeMap::new();
         for &c in &camel_list {

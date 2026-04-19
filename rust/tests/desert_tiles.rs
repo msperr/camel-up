@@ -2,7 +2,7 @@ use camel_cup::{Camel, DesertTile, Field, State};
 use std::collections::BTreeMap;
 use std::panic::catch_unwind;
 
-fn mk_map(entries: &[(i32, Field)]) -> BTreeMap<i32, Field> {
+fn mk_map(entries: &[(u8, Field)]) -> BTreeMap<u8, Field> {
     let mut m = BTreeMap::new();
     for (k, v) in entries {
         m.insert(*k, v.clone());
@@ -40,7 +40,7 @@ fn test_move_camel_with_deserts_explicit() {
         {
             let state = State::new(mk_map(&base));
             let (res_state, desert_hit) = state.move_camel(Camel::White, steps);
-            assert_eq!(desert_hit, Some(3));
+            assert_eq!(desert_hit, Some(3u8));
             let expected = vec![
                 (3, Field::Desert(DesertTile::Oasis)),
                 (4, Field::Camels(vec![Camel::White])),
@@ -54,7 +54,7 @@ fn test_move_camel_with_deserts_explicit() {
             entries.push((4, Field::Camels(vec![Camel::Orange])));
             let state = State::new(mk_map(&entries));
             let (res_state, desert_hit) = state.move_camel(Camel::White, steps);
-            assert_eq!(desert_hit, Some(3));
+            assert_eq!(desert_hit, Some(3u8));
             let expected = vec![
                 (3, Field::Desert(DesertTile::Oasis)),
                 (4, Field::Camels(vec![Camel::Orange, Camel::White])),
@@ -82,7 +82,7 @@ fn test_move_camel_with_deserts_explicit() {
         {
             let state = State::new(mk_map(&base));
             let (res_state, desert_hit) = state.move_camel(Camel::White, steps);
-            assert_eq!(desert_hit, Some(3));
+            assert_eq!(desert_hit, Some(3u8));
             let expected = vec![
                 (2, Field::Camels(vec![Camel::White])),
                 (3, Field::Desert(DesertTile::Mirage)),
@@ -140,7 +140,7 @@ fn test_mirage_prepends_white_from_stack() {
 
     // steps = 1 moves White from 1 -> 2 (hits Mirage), mirage moves it back to 1 and prepends
     let (res_state, desert_hit) = state.move_camel(Camel::White, 1);
-    assert_eq!(desert_hit, Some(2));
+    assert_eq!(desert_hit, Some(2u8));
     let expected = vec![
         (1, Field::Camels(vec![Camel::White, Camel::Yellow])),
         (2, Field::Desert(DesertTile::Mirage)),
@@ -166,8 +166,8 @@ fn test_move_all_camels_various_steps_with_deserts() {
 
     let state = State::new(mk_map(&initial));
 
-    let expect = |(res_state, desert_hit): (State, Option<i32>),
-                  expected_entries: &[(i32, Field)]| {
+    let expect = |(res_state, _desert_hit): (State, Option<u8>),
+                  expected_entries: &[(u8, Field)]| {
         // desert_hit value is asserted by checking expected entries for desert keys
         assert_eq!(res_state.data, mk_map(expected_entries));
     };
@@ -211,7 +211,7 @@ fn test_move_all_camels_various_steps_with_deserts() {
     }
     {
         let (res_state, desert_hit) = state.move_camel(Camel::White, 3);
-        assert_eq!(desert_hit, Some(4));
+        assert_eq!(desert_hit, Some(4u8));
         expect(
             (res_state, desert_hit),
             &[
@@ -234,7 +234,7 @@ fn test_move_all_camels_various_steps_with_deserts() {
     // YELLOW at 3 (pos 0)
     {
         let (res_state, desert_hit) = state.move_camel(Camel::Yellow, 1);
-        assert_eq!(desert_hit, Some(4));
+        assert_eq!(desert_hit, Some(4u8));
         expect(
             (res_state, desert_hit),
             &[
@@ -271,7 +271,7 @@ fn test_move_all_camels_various_steps_with_deserts() {
     }
     {
         let (res_state, desert_hit) = state.move_camel(Camel::Yellow, 3);
-        assert_eq!(desert_hit, Some(6));
+        assert_eq!(desert_hit, Some(6u8));
         expect(
             (res_state, desert_hit),
             &[
@@ -290,12 +290,15 @@ fn test_move_all_camels_various_steps_with_deserts() {
     // ORANGE at 3 (pos 1)
     {
         let (res_state, desert_hit) = state.move_camel(Camel::Orange, 1);
-        assert_eq!(desert_hit, Some(4));
+        assert_eq!(desert_hit, Some(4u8));
         expect(
             (res_state, desert_hit),
             &[
                 (1, Field::Camels(vec![Camel::White])),
-                (3, Field::Camels(vec![Camel::Orange, Camel::Green, Camel::Yellow])),
+                (
+                    3,
+                    Field::Camels(vec![Camel::Orange, Camel::Green, Camel::Yellow]),
+                ),
                 (4, Field::Desert(DesertTile::Mirage)),
                 (5, Field::Camels(vec![Camel::Blue])),
                 (6, Field::Desert(DesertTile::Oasis)),
@@ -320,7 +323,7 @@ fn test_move_all_camels_various_steps_with_deserts() {
     }
     {
         let (res_state, desert_hit) = state.move_camel(Camel::Orange, 3);
-        assert_eq!(desert_hit, Some(6));
+        assert_eq!(desert_hit, Some(6u8));
         expect(
             (res_state, desert_hit),
             &[
@@ -337,7 +340,7 @@ fn test_move_all_camels_various_steps_with_deserts() {
     // GREEN at 3 (pos 2)
     {
         let (res_state, desert_hit) = state.move_camel(Camel::Green, 1);
-        assert_eq!(desert_hit, Some(4));
+        assert_eq!(desert_hit, Some(4u8));
         expect(
             (res_state, desert_hit),
             &[
@@ -367,7 +370,7 @@ fn test_move_all_camels_various_steps_with_deserts() {
     }
     {
         let (res_state, desert_hit) = state.move_camel(Camel::Green, 3);
-        assert_eq!(desert_hit, Some(6));
+        assert_eq!(desert_hit, Some(6u8));
         expect(
             (res_state, desert_hit),
             &[
@@ -384,7 +387,7 @@ fn test_move_all_camels_various_steps_with_deserts() {
     // BLUE at 5 (pos 0)
     {
         let (res_state, desert_hit) = state.move_camel(Camel::Blue, 1);
-        assert_eq!(desert_hit, Some(6));
+        assert_eq!(desert_hit, Some(6u8));
         expect(
             (res_state, desert_hit),
             &[
