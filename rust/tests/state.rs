@@ -1,4 +1,4 @@
-use camel_cup::{Camel, Space, State};
+use camel_up::{Camel, Space, State};
 use std::collections::BTreeMap;
 
 fn mk_map(entries: &[(u8, Vec<Camel>)]) -> BTreeMap<u8, Space> {

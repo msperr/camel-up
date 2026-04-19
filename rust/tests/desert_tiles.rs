@@ -1,4 +1,4 @@
-use camel_cup::{Camel, DesertTile, Space, State};
+use camel_up::{Camel, DesertTile, Space, State};
 use std::collections::BTreeMap;
 use std::panic::catch_unwind;
 

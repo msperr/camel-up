@@ -33,7 +33,7 @@ cargo clippy -- -D warnings
 
 Repository layout & naming gotchas
 ---------------------------------
-- Repo name: `camel-up` (filesystem root). Crate name inside Rust manifest is still `camel_cup` (see rust/Cargo.toml).
+- Repo name: `camel-up` (filesystem root). Crate name inside Rust manifest is `camel_up` (see rust/Cargo.toml). After this change imports should use `use camel_up::{...}`.
 - Primary crate: rust/ (Cargo.toml, src/, tests/). Treat `rust/` as the workspace package.
 - Public API is exported from rust/src/lib.rs: Camel, DesertTile, Space, State.
 
@@ -67,7 +67,7 @@ Editing, commits and history rules
 
 Operational gotchas an agent would miss
 --------------------------------------
-- Repo != crate name: many references and tests use `use camel_cup::{...}` even though the repo is `camel-up`.
+- Repo != crate name: before this change many references used `use camel_cup::{...}`. Update imports to `use camel_up::{...}` after renaming Cargo.toml.
 - Tests and code expect u8 arithmetic semantics; changing types to i32 or removing checked arithmetic will break invariants/tests.
 - There used to be a worktree for branches; check `git worktree list` if branch deletion fails.
 

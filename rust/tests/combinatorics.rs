@@ -1,4 +1,4 @@
-use camel_cup::combinatorics::{Permutations, Product};
+use camel_up::combinatorics::{Permutations, Product};
 
 #[test]
 fn test_permutations_small() {
