@@ -247,8 +247,8 @@ impl State {
                 .data
                 .values()
                 .map(|f| match f {
-            Space::Camels(v) => v.iter().filter(|&&c| c == camel).count(),
-            Space::Desert(_) => 0usize,
+                    Space::Camels(v) => v.iter().filter(|&&c| c == camel).count(),
+                    Space::Desert(_) => 0usize,
                 })
                 .sum();
             if occurrences != 1 {
