@@ -11,7 +11,7 @@ pub enum Camel {
 }
 
 /// Desert tile types
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DesertTile {
     Oasis,
     Mirage,
@@ -215,9 +215,17 @@ impl State {
         (state, counts)
     }
 
-    /// Tally outcomes by running all permutations of camels and all combinations of dice
-    /// choices = [1,2,3] repeated `num_camels` times. Returns a map from Camel -> counts per position.
-    pub fn tally_outcomes(&self) -> std::collections::BTreeMap<Camel, Vec<usize>> {
+    /// Simulate exhaustive outcomes by running all permutations of camels and all combinations of dice
+    /// choices = [1,2,3] repeated `num_camels` times.
+    /// Returns a tuple of:
+    /// - map from Camel -> counts per position (Vec indexed by final position)
+    /// - map from field key (u8) -> total desert hit counts across all simulations
+    pub fn simulate_outcomes(
+        &self,
+    ) -> (
+        std::collections::BTreeMap<Camel, Vec<usize>>,
+        std::collections::BTreeMap<u8, usize>,
+    ) {
         use crate::combinatorics::{Permutations, Product};
 
         let camel_list = vec![
@@ -252,11 +260,14 @@ impl State {
             counts.insert(c, vec![0usize; num_camels]);
         }
 
+        let mut desert_counts: std::collections::BTreeMap<u8, usize> =
+            std::collections::BTreeMap::new();
+
         for perm in Permutations::new(camel_list.clone()) {
             for comb in Product::new(choices.clone(), num_camels) {
                 // Avoid allocating a Vec for each permutation+combination by passing the
                 // zipped iterator directly. `move_multiple_camels` accepts any IntoIterator.
-                let (result, _counts) =
+                let (result, counts_map) =
                     self.move_multiple_camels(perm.iter().cloned().zip(comb.into_iter()));
                 let order = result.order();
                 for (pos, &camel) in order.iter().enumerate() {
@@ -264,10 +275,14 @@ impl State {
                         v[pos] += 1;
                     }
                 }
+                // accumulate desert hit counts per position
+                for (k, &v) in &counts_map {
+                    *desert_counts.entry(*k).or_insert(0) += v;
+                }
             }
         }
 
-        counts
+        (counts, desert_counts)
     }
 
     /// Return all camels flattened in order by the map's key.
@@ -280,5 +295,60 @@ impl State {
                 Field::Desert(_) => Vec::new(),
             })
             .collect()
+    }
+
+    /// Evaluate desert placements: for each position and desert tile type, compute how many
+    /// desert hits would occur if that desert tile were placed at that position.
+    /// Returns a map: position -> (DesertTile -> hit_count)
+    pub fn evaluate_desert_placements(
+        &self,
+    ) -> std::collections::BTreeMap<u8, std::collections::BTreeMap<DesertTile, usize>> {
+        let mut result: std::collections::BTreeMap<
+            u8,
+            std::collections::BTreeMap<DesertTile, usize>,
+        > = std::collections::BTreeMap::new();
+
+        if self.data.is_empty() {
+            return result;
+        }
+
+        let min_key = *self.data.keys().next().unwrap();
+        let max_key = *self.data.keys().last().unwrap();
+        let bound = std::cmp::max(max_key, 16u8);
+
+        for pos in min_key..=bound {
+            for &tile in &[DesertTile::Oasis, DesertTile::Mirage] {
+                // feasibility: cannot place on camels or on an existing desert
+                match self.data.get(&pos) {
+                    Some(Field::Camels(_)) => continue,
+                    Some(Field::Desert(_)) => continue,
+                    _ => {}
+                }
+
+                // adjacent left desert?
+                if let Some(left) = pos.checked_sub(1) {
+                    if let Some(Field::Desert(_)) = self.data.get(&left) {
+                        continue;
+                    }
+                }
+                // adjacent right desert?
+                if let Some(right) = pos.checked_add(1) {
+                    if let Some(Field::Desert(_)) = self.data.get(&right) {
+                        continue;
+                    }
+                }
+
+                // create clone with desert at pos
+                let mut clone_map = self.data.clone();
+                clone_map.insert(pos, Field::Desert(tile));
+                let clone_state = State::new(clone_map);
+
+                let (_camel_counts, desert_counts) = clone_state.simulate_outcomes();
+                let hits = desert_counts.get(&pos).cloned().unwrap_or(0usize);
+                result.entry(pos).or_default().insert(tile, hits);
+            }
+        }
+
+        result
     }
 }
