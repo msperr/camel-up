@@ -16,6 +16,7 @@ Quick commands
 - Check formatting: `rustfmt --edition 2021 --check $(git ls-files "**/*.rs")` or simply `cargo fmt -- --check`
 - Fix formatting: `cargo fmt`
 - Static analysis / clippy: install via `rustup component add clippy` then run `cargo clippy -- -D warnings` (treat warnings as errors).
+ - Static analysis / clippy: install via `rustup component add clippy` then run `cargo clippy -- -D warnings` (treat warnings as errors). It's recommended to run `cargo clippy -- -D warnings` as part of your pre-commit checks or CI pipeline.
 
 Project layout
 --------------

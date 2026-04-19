@@ -3,47 +3,65 @@ use std::collections::BTreeMap;
 /// Camel colors
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Camel {
-    WHITE,
-    YELLOW,
-    ORANGE,
-    GREEN,
-    BLUE,
+    White,
+    Yellow,
+    Orange,
+    Green,
+    Blue,
+}
+
+/// Desert tile types
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DesertTile {
+    Oasis,
+    Mirage,
+}
+
+/// A field can either contain camels or a desert tile
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Field {
+    Camels(Vec<Camel>),
+    Desert(DesertTile),
 }
 
 /// Game state
 #[derive(Clone, Debug)]
 pub struct State {
-    /// Mapping from integer keys to lists of camels.
-    pub data: BTreeMap<i32, Vec<Camel>>,
+    /// Mapping from integer keys to field contents (camels or desert)
+    pub data: BTreeMap<i32, Field>,
 }
 
 impl State {
     /// Create a new State from the provided map
-    pub fn new(data: BTreeMap<i32, Vec<Camel>>) -> Self {
+    pub fn new(data: BTreeMap<i32, Field>) -> Self {
         State { data }
     }
 
     /// Move `camel` forward by `steps` (dice result).
-    /// Moves `camel` and all following camels within the same field to `field + steps`.
+    /// Returns (new_state, optional_desert_field_key)
+    /// If the moved camel hits a desert tile, the key of that desert tile is returned.
     ///
     /// Panics if:
     /// - `steps < 1`
     /// - `camel` is not found in `data`
     /// - `camel` appears more than once in `data`
-    pub fn move_camel(&self, camel: Camel, steps: i32) -> Self {
+    /// - precondition violated: if a desert is adjacent to another desert in the direction moved
+    pub fn move_camel(&self, camel: Camel, steps: i32) -> (Self, Option<i32>) {
         if steps < 1 {
             panic!("steps must be >= 1, got {}", steps);
         }
 
         // Find the unique occurrence of camel: (field, position)
         let mut found: Option<(i32, usize)> = None;
-        for (k, v) in &self.data {
-            for (i, &c) in v.iter().enumerate() {
-                if c == camel {
-                    if found.is_some() {
-                        panic!("camel {:?} appears multiple times in data", camel);
+        for (k, field_val) in &self.data {
+            if let Field::Camels(v) = field_val {
+                for (i, &c) in v.iter().enumerate() {
+                    if c == camel {
+                        if found.is_some() {
+                            panic!("camel {:?} appears multiple times in data", camel);
+                        }
+                        found = Some((*k, i));
                     }
-                    found = Some((*k, i));
                 }
             }
         }
@@ -65,39 +83,115 @@ impl State {
         // Clone map and perform the mutation on the clone
         let mut map = self.data.clone();
 
-        // Remove the source vector so we can mutate the map without overlapping borrows
-        let mut src_vec = map
-            .remove(&field)
-            .unwrap_or_else(|| panic!("internal error: expected key {} present", field));
+        // Remove the source camels vector so we can mutate the map without overlapping borrows
+        let mut src_vec = match map.remove(&field) {
+            Some(Field::Camels(v)) => v,
+            Some(Field::Desert(_)) => {
+                panic!("internal error: expected camels at {}, found desert", field)
+            }
+            None => panic!("internal error: expected key {} present", field),
+        };
 
         // split_off returns the tail starting at `position`
         let tail = src_vec.split_off(position);
 
         // if there is a non-empty prefix, put it back under the original field
         if !src_vec.is_empty() {
-            map.insert(field, src_vec);
+            map.insert(field, Field::Camels(src_vec));
         }
 
-        // append the tail to destination vector (create if necessary)
-        let dest_vec = map.entry(new_field).or_default();
-        dest_vec.extend(tail);
+        // Now inspect destination
+        match map.get(&new_field) {
+            None => {
+                // empty field — insert the tail
+                map.insert(new_field, Field::Camels(tail));
+                (State { data: map }, None)
+            }
+            Some(Field::Camels(existing)) => {
+                // append to existing
+                let mut new_vec = existing.clone();
+                new_vec.extend(tail);
+                map.insert(new_field, Field::Camels(new_vec));
+                (State { data: map }, None)
+            }
+            Some(Field::Desert(tile)) => {
+                // precondition: if data[new_field] is Desert, then data[new_field +/- 1] must not be Desert
+                // For Oasis we will move forward (+1), for Mirage we move back (-1).
+                match tile {
+                    DesertTile::Oasis => {
+                        // precondition check: new_field + 1 must not be Desert in original self.data
+                        let forward = new_field.checked_add(1).unwrap_or_else(|| panic!(
+                            "moving camel {:?} from field {} by {} steps overflows i32 when applying oasis",
+                            camel, new_field, 1
+                        ));
+                        if let Some(Field::Desert(_)) = self.data.get(&forward) {
+                            panic!(
+                                "precondition violated: desert at {} adjacent to desert at {}",
+                                new_field, forward
+                            );
+                        }
 
-        State { data: map }
+                        // append to forward (create or append)
+                        match map.get(&forward) {
+                            Some(Field::Camels(existing_fwd)) => {
+                                let mut new_vec = existing_fwd.clone();
+                                new_vec.extend(tail);
+                                map.insert(forward, Field::Camels(new_vec));
+                            }
+                            Some(Field::Desert(_)) => unreachable!(),
+                            None => {
+                                map.insert(forward, Field::Camels(tail));
+                            }
+                        }
+                        (State { data: map }, Some(new_field))
+                    }
+                    DesertTile::Mirage => {
+                        // precondition check: new_field - 1 must not be Desert in original self.data
+                        let back = new_field.checked_sub(1).unwrap_or_else(|| panic!(
+                            "moving camel {:?} from field {} by {} steps underflows i32 when applying mirage",
+                            camel, new_field, 1
+                        ));
+                        if let Some(Field::Desert(_)) = self.data.get(&back) {
+                            panic!(
+                                "precondition violated: desert at {} adjacent to desert at {}",
+                                new_field, back
+                            );
+                        }
+
+                        // prepend to back: if camels exist, prepend; otherwise insert
+                        match map.remove(&back) {
+                            Some(Field::Camels(existing_back)) => {
+                                // prepend tail before existing_back
+                                let mut new_vec = tail;
+                                new_vec.extend(existing_back);
+                                map.insert(back, Field::Camels(new_vec));
+                            }
+                            Some(Field::Desert(_)) => unreachable!(),
+                            None => {
+                                map.insert(back, Field::Camels(tail));
+                            }
+                        }
+                        (State { data: map }, Some(new_field))
+                    }
+                }
+            }
+        }
     }
 
-    /// Apply a sequence of moves. Each tuple is (camel, steps).
-    /// Moves are applied sequentially in order.
-    /// Apply a sequence of moves. Each item is (camel, steps).
-    /// Moves are applied sequentially in order.
-    pub fn move_multiple_camels<I>(&self, moves: I) -> Self
+    pub fn move_multiple_camels<I>(&self, moves: I) -> (Self, BTreeMap<i32, usize>)
     where
         I: IntoIterator<Item = (Camel, i32)>,
     {
         let mut state = self.clone();
+        let mut counts: BTreeMap<i32, usize> = BTreeMap::new();
         for (camel, steps) in moves.into_iter() {
-            state = state.move_camel(camel, steps);
+            let (new_state, maybe_desert) = state.move_camel(camel, steps);
+            if let Some(k) = maybe_desert {
+                *counts.entry(k).or_insert(0) += 1usize;
+            }
+            state = new_state;
         }
-        state
+        (state, counts)
     }
 
     /// Tally outcomes by running all permutations of camels and all combinations of dice
@@ -106,18 +200,21 @@ impl State {
         use crate::combinatorics::{Permutations, Product};
 
         let camel_list = vec![
-            Camel::WHITE,
-            Camel::YELLOW,
-            Camel::ORANGE,
-            Camel::GREEN,
-            Camel::BLUE,
+            Camel::White,
+            Camel::Yellow,
+            Camel::Orange,
+            Camel::Green,
+            Camel::Blue,
         ];
         // Preconditions: every Camel must appear exactly once in self.data
         for &camel in &camel_list {
             let occurrences: usize = self
                 .data
                 .values()
-                .map(|v| v.iter().filter(|&&c| c == camel).count())
+                .map(|f| match f {
+                    Field::Camels(v) => v.iter().filter(|&&c| c == camel).count(),
+                    Field::Desert(_) => 0usize,
+                })
                 .sum();
             if occurrences != 1 {
                 panic!(
@@ -138,7 +235,8 @@ impl State {
             for comb in Product::new(choices.clone(), num_camels) {
                 // Avoid allocating a Vec for each permutation+combination by passing the
                 // zipped iterator directly. `move_multiple_camels` accepts any IntoIterator.
-                let result = self.move_multiple_camels(perm.iter().cloned().zip(comb.into_iter()));
+                let (result, _counts) =
+                    self.move_multiple_camels(perm.iter().cloned().zip(comb.into_iter()));
                 let order = result.order();
                 for (pos, &camel) in order.iter().enumerate() {
                     if let Some(v) = counts.get_mut(&camel) {
@@ -156,7 +254,10 @@ impl State {
     pub fn order(&self) -> Vec<Camel> {
         self.data
             .iter()
-            .flat_map(|(_, v)| v.iter().copied())
+            .flat_map(|(_, f)| match f {
+            Field::Camels(v) => v.to_vec(),
+            Field::Desert(_) => Vec::new(),
+            })
             .collect()
     }
 }
