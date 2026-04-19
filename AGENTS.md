@@ -10,7 +10,7 @@ Quick commands
 --------------
 - Build library: `cargo build`
 - Run tests: `cargo test`
-- Run a single integration test file: `cargo test --test move_camel`
+-- Run a single integration test file: `cargo test --test move_unit`
 - Run a single unit or doc test by name: `cargo test <test_name>` (use exact name or a substring)
 - Run tests with verbose output: `cargo test -- --nocapture`
 - Check formatting: `rustfmt --edition 2021 --check $(git ls-files "**/*.rs")` or simply `cargo fmt -- --check`
@@ -22,20 +22,20 @@ Project layout
 - rust/: the Rust crate root with Cargo.toml and src/
   - src/state.rs: primary implementation (Camel enum and State)
   - src/lib.rs: exposes the public API
-  - tests/: integration tests (move_camel.rs)
+  - tests/: integration tests (move_unit.rs)
 
 Key public API notes
 --------------------
 - Camel enum: variants White, Yellow, Orange, Green, Blue (derives Ord/Hash so usable in maps).
 - State:
-  - `new(data: BTreeMap<u8, Field>) -> State`
-  - `move_camel(&self, camel: Camel, steps: u8) -> (State, Option<u8>)` — Panics if steps == 0, camel not found, camel appears multiple times, or precondition violations (e.g. adjacent deserts).
+  - `new(data: BTreeMap<u8, Space>) -> State`
+  - `move_unit(&self, camel: Camel, steps: u8) -> (State, Option<u8>)` — Panics if steps == 0, camel not found, camel appears multiple times, or precondition violations (e.g. adjacent deserts).
   - `move_multiple_camels(&self, combinations: impl IntoIterator<Item=(Camel,u8)>) -> (State, BTreeMap<u8, usize>)` — Applies moves sequentially and returns aggregated desert hit counts per field.
   - `simulate_outcomes(&self) -> (BTreeMap<Camel, Vec<usize>>, BTreeMap<u8, usize>)` — Runs exhaustive permutations and dice choices, returning camel position counts and desert-hit totals per field.
   - `evaluate_desert_placements(&self) -> BTreeMap<u8, BTreeMap<DesertTile, usize>>` — For each candidate field (1..=16) and each DesertTile, returns how many desert-hits would occur if that tile were placed there (feasibility checks applied).
 
 Notes:
-- Field keys and dice `steps` use `u8` (valid field keys are in range 1..=16). Arithmetic on keys uses checked_add/checked_sub to avoid wrapping.
+- Space keys and dice `steps` use `u8` (valid space keys are in range 1..=16). Arithmetic on keys uses checked_add/checked_sub to avoid wrapping.
 - DesertTile derives Ord so it can be used as a key in BTreeMap when needed.
 
 Testing notes
@@ -65,7 +65,7 @@ Types and Mutability
 Naming
 - Use CamelCase for types and enums: `Camel`, `State`.
 - Use UPPER_SNAKE_CASE for enum variants only when domain requires; otherwise use Rust's conventional `PascalCase` values. This project currently uses `WHITE`, `YELLOW`, etc. Keep existing names unchanged to avoid churn.
-- Use snake_case for functions and variables: `move_camel`, `new_field`, `src_vec`, `position`.
+-- Use snake_case for functions and variables: `move_unit`, `dest_space`, `src_stack`, `idx`.
 
 Functions and APIs
 - Prefer immutable, functional updates (return new State) unless mutation is required. Current `State::move_camel` returns a new State.
