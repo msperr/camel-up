@@ -114,67 +114,83 @@ impl State {
                 map.insert(new_field, Field::Camels(new_vec));
                 (State { data: map }, None)
             }
-            Some(Field::Desert(tile)) => {
-                // precondition: if data[new_field] is Desert, then data[new_field +/- 1] must not be Desert
-                // For Oasis we will move forward (+1), for Mirage we move back (-1).
-                match tile {
-                    DesertTile::Oasis => {
-                        // precondition check: new_field + 1 must not be Desert in original self.data
-                        let forward = new_field.checked_add(1).unwrap_or_else(|| panic!(
-                            "moving camel {:?} from field {} by {} steps overflows i32 when applying oasis",
-                            camel, new_field, 1
-                        ));
-                        if let Some(Field::Desert(_)) = self.data.get(&forward) {
-                            panic!(
-                                "precondition violated: desert at {} adjacent to desert at {}",
-                                new_field, forward
-                            );
-                        }
+            Some(Field::Desert(_)) => {
+                // delegate desert-specific behaviour to helper
+                let desert_hit = self.apply_desert_effect(&mut map, new_field, tail);
+                (State { data: map }, desert_hit)
+            }
+        }
+    }
 
-                        // append to forward (create or append)
-                        match map.get(&forward) {
-                            Some(Field::Camels(existing_fwd)) => {
-                                let mut new_vec = existing_fwd.clone();
-                                new_vec.extend(tail);
-                                map.insert(forward, Field::Camels(new_vec));
-                            }
-                            Some(Field::Desert(_)) => unreachable!(),
-                            None => {
-                                map.insert(forward, Field::Camels(tail));
-                            }
-                        }
-                        (State { data: map }, Some(new_field))
+    // Apply desert tile effect when a camel tail landed on `desert_field`.
+    // Mutates `map` (the cloned/working map) to apply the oasis/mirage behaviour
+    // and returns Some(desert_field). Uses `self.data` for the precondition checks.
+    fn apply_desert_effect(
+        &self,
+        map: &mut BTreeMap<i32, Field>,
+        desert_field: i32,
+        tail: Vec<Camel>,
+    ) -> Option<i32> {
+        // Look up the tile type from the original State (self.data).
+        match self.data.get(&desert_field) {
+            Some(Field::Desert(DesertTile::Oasis)) => {
+                let forward = desert_field.checked_add(1).unwrap_or_else(|| panic!(
+                    "moving camel from desert {} by oasis forward would overflow",
+                    desert_field
+                ));
+                if let Some(Field::Desert(_)) = self.data.get(&forward) {
+                    panic!(
+                        "precondition violated: desert at {} adjacent to desert at {}",
+                        desert_field, forward
+                    );
+                }
+
+                // append to forward (create or append)
+                match map.get(&forward) {
+                    Some(Field::Camels(existing_fwd)) => {
+                        let mut new_vec = existing_fwd.clone();
+                        new_vec.extend(tail);
+                        map.insert(forward, Field::Camels(new_vec));
                     }
-                    DesertTile::Mirage => {
-                        // precondition check: new_field - 1 must not be Desert in original self.data
-                        let back = new_field.checked_sub(1).unwrap_or_else(|| panic!(
-                            "moving camel {:?} from field {} by {} steps underflows i32 when applying mirage",
-                            camel, new_field, 1
-                        ));
-                        if let Some(Field::Desert(_)) = self.data.get(&back) {
-                            panic!(
-                                "precondition violated: desert at {} adjacent to desert at {}",
-                                new_field, back
-                            );
-                        }
-
-                        // prepend to back: if camels exist, prepend; otherwise insert
-                        match map.remove(&back) {
-                            Some(Field::Camels(existing_back)) => {
-                                // prepend tail before existing_back
-                                let mut new_vec = tail;
-                                new_vec.extend(existing_back);
-                                map.insert(back, Field::Camels(new_vec));
-                            }
-                            Some(Field::Desert(_)) => unreachable!(),
-                            None => {
-                                map.insert(back, Field::Camels(tail));
-                            }
-                        }
-                        (State { data: map }, Some(new_field))
+                    Some(Field::Desert(_)) => unreachable!(),
+                    None => {
+                        map.insert(forward, Field::Camels(tail));
                     }
                 }
+
+                Some(desert_field)
             }
+            Some(Field::Desert(DesertTile::Mirage)) => {
+                let back = desert_field.checked_sub(1).unwrap_or_else(|| panic!(
+                    "moving camel from desert {} by mirage back would underflow",
+                    desert_field
+                ));
+                if let Some(Field::Desert(_)) = self.data.get(&back) {
+                    panic!(
+                        "precondition violated: desert at {} adjacent to desert at {}",
+                        desert_field, back
+                    );
+                }
+
+                // prepend to back: if camels exist, prepend; otherwise insert
+                match map.remove(&back) {
+                    Some(Field::Camels(existing_back)) => {
+                        let mut new_vec = tail;
+                        new_vec.extend(existing_back);
+                        map.insert(back, Field::Camels(new_vec));
+                    }
+                    Some(Field::Desert(_)) => unreachable!(),
+                    None => {
+                        map.insert(back, Field::Camels(tail));
+                    }
+                }
+
+                Some(desert_field)
+            }
+            other => panic!(
+                "internal error: expected Desert at {}, found {:?}",
+                desert_field, other
+            ),
         }
     }
 
@@ -255,8 +271,8 @@ impl State {
         self.data
             .iter()
             .flat_map(|(_, f)| match f {
-            Field::Camels(v) => v.to_vec(),
-            Field::Desert(_) => Vec::new(),
+                Field::Camels(v) => v.to_vec(),
+                Field::Desert(_) => Vec::new(),
             })
             .collect()
     }
