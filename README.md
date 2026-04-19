@@ -1,4 +1,4 @@
-camel-cup
+camel-up
 =========
 
 A small Rust library implementing a minimal model for a "camel cup" game:
@@ -51,5 +51,11 @@ Contributing
 
 Contact / License
 -----------------
-- Repository: https://github.com/msperr/camel-cup
+- Repository: https://github.com/msperr/camel-up
 - Add a LICENSE file (MIT/Apache2 suggested) if you want a clear open-source license.
+
+
+Recent changes
+---------------
+- Repository renamed from camel-cup to camel-up.
+- Consolidated agent guidance and documentation updates.

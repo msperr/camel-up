@@ -3,7 +3,7 @@ AGENTS
 
 Purpose
 -------
-This file documents how agentic coding assistants should operate inside this repository (camel-cup).
+This file documents how agentic coding assistants should operate inside this repository (camel-up).
 It includes build, lint, and test commands, conventions for code style, and operational rules for modifying the codebase.
 
 Quick commands
