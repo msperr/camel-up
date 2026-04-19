@@ -1,8 +1,5 @@
 use std::collections::BTreeMap;
 
-// Maximum field index (inclusive)
-const MAX_FIELD: u8 = 16;
-
 /// Camel colors
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Camel {
@@ -14,7 +11,7 @@ pub enum Camel {
 }
 
 /// Desert tile types
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DesertTile {
     Oasis,
     Mirage,
@@ -31,12 +28,12 @@ pub enum Field {
 #[derive(Clone, Debug)]
 pub struct State {
     /// Mapping from integer keys to field contents (camels or desert)
-    pub data: BTreeMap<u8, Field>,
+    pub data: BTreeMap<i32, Field>,
 }
 
 impl State {
     /// Create a new State from the provided map
-    pub fn new(data: BTreeMap<u8, Field>) -> Self {
+    pub fn new(data: BTreeMap<i32, Field>) -> Self {
         State { data }
     }
 
@@ -49,13 +46,13 @@ impl State {
     /// - `camel` is not found in `data`
     /// - `camel` appears more than once in `data`
     /// - precondition violated: if a desert is adjacent to another desert in the direction moved
-    pub fn move_camel(&self, camel: Camel, steps: u8) -> (Self, Option<u8>) {
-        if steps == 0 {
-            panic!("steps must be >= 1, got 0");
+    pub fn move_camel(&self, camel: Camel, steps: i32) -> (Self, Option<i32>) {
+        if steps < 1 {
+            panic!("steps must be >= 1, got {}", steps);
         }
 
         // Find the unique occurrence of camel: (field, position)
-        let mut found: Option<(u8, usize)> = None;
+        let mut found: Option<(i32, usize)> = None;
         for (k, field_val) in &self.data {
             if let Field::Camels(v) = field_val {
                 for (i, &c) in v.iter().enumerate() {
@@ -74,10 +71,11 @@ impl State {
             None => panic!("camel {:?} not found in state.data", camel),
         };
 
-        // Compute destination using checked_add on u8 to preserve u8 semantics.
+        // Use checked_add to detect overflow when adding steps to field.
+        // This panics with a clear message if arithmetic would overflow i32.
         let new_field = field.checked_add(steps).unwrap_or_else(|| {
             panic!(
-                "moving camel {:?} from field {} by {} steps would overflow u8",
+                "moving camel {:?} from field {} by {} steps overflows i32",
                 camel, field, steps
             )
         });
@@ -116,98 +114,76 @@ impl State {
                 map.insert(new_field, Field::Camels(new_vec));
                 (State { data: map }, None)
             }
-            Some(Field::Desert(_)) => {
-                // delegate desert-specific behaviour to helper
-                let desert_hit = self.apply_desert_effect(&mut map, new_field, tail);
-                (State { data: map }, desert_hit)
+            Some(Field::Desert(tile)) => {
+                // precondition: if data[new_field] is Desert, then data[new_field +/- 1] must not be Desert
+                // For Oasis we will move forward (+1), for Mirage we move back (-1).
+                match tile {
+                    DesertTile::Oasis => {
+                        // precondition check: new_field + 1 must not be Desert in original self.data
+                        let forward = new_field.checked_add(1).unwrap_or_else(|| panic!(
+                            "moving camel {:?} from field {} by {} steps overflows i32 when applying oasis",
+                            camel, new_field, 1
+                        ));
+                        if let Some(Field::Desert(_)) = self.data.get(&forward) {
+                            panic!(
+                                "precondition violated: desert at {} adjacent to desert at {}",
+                                new_field, forward
+                            );
+                        }
+
+                        // append to forward (create or append)
+                        match map.get(&forward) {
+                            Some(Field::Camels(existing_fwd)) => {
+                                let mut new_vec = existing_fwd.clone();
+                                new_vec.extend(tail);
+                                map.insert(forward, Field::Camels(new_vec));
+                            }
+                            Some(Field::Desert(_)) => unreachable!(),
+                            None => {
+                                map.insert(forward, Field::Camels(tail));
+                            }
+                        }
+                        (State { data: map }, Some(new_field))
+                    }
+                    DesertTile::Mirage => {
+                        // precondition check: new_field - 1 must not be Desert in original self.data
+                        let back = new_field.checked_sub(1).unwrap_or_else(|| panic!(
+                            "moving camel {:?} from field {} by {} steps underflows i32 when applying mirage",
+                            camel, new_field, 1
+                        ));
+                        if let Some(Field::Desert(_)) = self.data.get(&back) {
+                            panic!(
+                                "precondition violated: desert at {} adjacent to desert at {}",
+                                new_field, back
+                            );
+                        }
+
+                        // prepend to back: if camels exist, prepend; otherwise insert
+                        match map.remove(&back) {
+                            Some(Field::Camels(existing_back)) => {
+                                // prepend tail before existing_back
+                                let mut new_vec = tail;
+                                new_vec.extend(existing_back);
+                                map.insert(back, Field::Camels(new_vec));
+                            }
+                            Some(Field::Desert(_)) => unreachable!(),
+                            None => {
+                                map.insert(back, Field::Camels(tail));
+                            }
+                        }
+                        (State { data: map }, Some(new_field))
+                    }
+                }
             }
         }
     }
 
-    // Apply desert tile effect when a camel tail landed on `desert_field`.
-    // Mutates `map` (the cloned/working map) to apply the oasis/mirage behaviour
-    // and returns Some(desert_field). Uses `self.data` for the precondition checks.
-    fn apply_desert_effect(
-        &self,
-        map: &mut BTreeMap<u8, Field>,
-        desert_field: u8,
-        tail: Vec<Camel>,
-    ) -> Option<u8> {
-        // Look up the tile type from the original State (self.data).
-        match self.data.get(&desert_field) {
-            Some(Field::Desert(DesertTile::Oasis)) => {
-                let forward = desert_field.checked_add(1).unwrap_or_else(|| {
-                    panic!(
-                        "moving camel from desert {} by oasis forward would overflow u8",
-                        desert_field
-                    )
-                });
-
-                if let Some(Field::Desert(_)) = self.data.get(&forward) {
-                    panic!(
-                        "precondition violated: desert at {} adjacent to desert at {}",
-                        desert_field, forward
-                    );
-                }
-
-                // append to forward (create or append)
-                match map.get(&forward) {
-                    Some(Field::Camels(existing_fwd)) => {
-                        let mut new_vec = existing_fwd.clone();
-                        new_vec.extend(tail);
-                        map.insert(forward, Field::Camels(new_vec));
-                    }
-                    Some(Field::Desert(_)) => unreachable!(),
-                    None => {
-                        map.insert(forward, Field::Camels(tail));
-                    }
-                }
-
-                Some(desert_field)
-            }
-            Some(Field::Desert(DesertTile::Mirage)) => {
-                let back = desert_field.checked_sub(1).unwrap_or_else(|| {
-                    panic!(
-                        "moving camel from desert {} by mirage back would underflow u8",
-                        desert_field
-                    )
-                });
-
-                if let Some(Field::Desert(_)) = self.data.get(&back) {
-                    panic!(
-                        "precondition violated: desert at {} adjacent to desert at {}",
-                        desert_field, back
-                    );
-                }
-
-                // prepend to back: if camels exist, prepend; otherwise insert
-                match map.remove(&back) {
-                    Some(Field::Camels(existing_back)) => {
-                        let mut new_vec = tail;
-                        new_vec.extend(existing_back);
-                        map.insert(back, Field::Camels(new_vec));
-                    }
-                    Some(Field::Desert(_)) => unreachable!(),
-                    None => {
-                        map.insert(back, Field::Camels(tail));
-                    }
-                }
-
-                Some(desert_field)
-            }
-            other => panic!(
-                "internal error: expected Desert at {}, found {:?}",
-                desert_field, other
-            ),
-        }
-    }
-
-    pub fn move_multiple_camels<I>(&self, moves: I) -> (Self, BTreeMap<u8, usize>)
+    pub fn move_multiple_camels<I>(&self, moves: I) -> (Self, BTreeMap<i32, usize>)
     where
-        I: IntoIterator<Item = (Camel, u8)>,
+        I: IntoIterator<Item = (Camel, i32)>,
     {
         let mut state = self.clone();
-        let mut counts: BTreeMap<u8, usize> = BTreeMap::new();
+        let mut counts: BTreeMap<i32, usize> = BTreeMap::new();
         for (camel, steps) in moves.into_iter() {
             let (new_state, maybe_desert) = state.move_camel(camel, steps);
             if let Some(k) = maybe_desert {
@@ -218,17 +194,9 @@ impl State {
         (state, counts)
     }
 
-    /// Simulate exhaustive outcomes by running all permutations of camels and all combinations of dice
-    /// choices = [1,2,3] repeated `num_camels` times.
-    /// Returns a tuple of:
-    /// - map from Camel -> counts per position (Vec indexed by final position)
-    /// - map from field key (u8) -> total desert hit counts across all simulations
-    pub fn simulate_outcomes(
-        &self,
-    ) -> (
-        std::collections::BTreeMap<Camel, Vec<usize>>,
-        std::collections::BTreeMap<u8, usize>,
-    ) {
+    /// Tally outcomes by running all permutations of camels and all combinations of dice
+    /// choices = [1,2,3] repeated `num_camels` times. Returns a map from Camel -> counts per position.
+    pub fn tally_outcomes(&self) -> std::collections::BTreeMap<Camel, Vec<usize>> {
         use crate::combinatorics::{Permutations, Product};
 
         let camel_list = vec![
@@ -256,21 +224,18 @@ impl State {
             }
         }
         let num_camels = camel_list.len();
-        let choices: Vec<u8> = vec![1, 2, 3];
+        let choices = vec![1_i32, 2, 3];
 
         let mut counts = std::collections::BTreeMap::new();
         for &c in &camel_list {
             counts.insert(c, vec![0usize; num_camels]);
         }
 
-        let mut desert_counts: std::collections::BTreeMap<u8, usize> =
-            std::collections::BTreeMap::new();
-
         for perm in Permutations::new(camel_list.clone()) {
             for comb in Product::new(choices.clone(), num_camels) {
                 // Avoid allocating a Vec for each permutation+combination by passing the
                 // zipped iterator directly. `move_multiple_camels` accepts any IntoIterator.
-                let (result, counts_map) =
+                let (result, _counts) =
                     self.move_multiple_camels(perm.iter().cloned().zip(comb.into_iter()));
                 let order = result.order();
                 for (pos, &camel) in order.iter().enumerate() {
@@ -278,14 +243,10 @@ impl State {
                         v[pos] += 1;
                     }
                 }
-                // accumulate desert hit counts per position
-                for (k, &v) in &counts_map {
-                    *desert_counts.entry(*k).or_insert(0) += v;
-                }
             }
         }
 
-        (counts, desert_counts)
+        counts
     }
 
     /// Return all camels flattened in order by the map's key.
@@ -294,66 +255,9 @@ impl State {
         self.data
             .iter()
             .flat_map(|(_, f)| match f {
-                Field::Camels(v) => v.to_vec(),
-                Field::Desert(_) => Vec::new(),
+            Field::Camels(v) => v.to_vec(),
+            Field::Desert(_) => Vec::new(),
             })
             .collect()
-    }
-
-    /// Evaluate desert placements: for each position and desert tile type, compute how many
-    /// desert hits would occur if that desert tile were placed at that position.
-    /// Returns a map: position -> (DesertTile -> hit_count)
-    pub fn evaluate_desert_placements(
-        &self,
-    ) -> std::collections::BTreeMap<u8, std::collections::BTreeMap<DesertTile, usize>> {
-        let mut result: std::collections::BTreeMap<
-            u8,
-            std::collections::BTreeMap<DesertTile, usize>,
-        > = std::collections::BTreeMap::new();
-
-        if self.data.is_empty() {
-            return result;
-        }
-
-        let min_key = *self.data.keys().next().unwrap();
-        if min_key > MAX_FIELD {
-            return result;
-        }
-        let bound = MAX_FIELD;
-
-        for pos in min_key..=bound {
-            for &tile in &[DesertTile::Oasis, DesertTile::Mirage] {
-                // feasibility: cannot place on camels or on an existing desert
-                match self.data.get(&pos) {
-                    Some(Field::Camels(_)) => continue,
-                    Some(Field::Desert(_)) => continue,
-                    _ => {}
-                }
-
-                // adjacent left desert?
-                if let Some(left) = pos.checked_sub(1) {
-                    if let Some(Field::Desert(_)) = self.data.get(&left) {
-                        continue;
-                    }
-                }
-                // adjacent right desert?
-                if let Some(right) = pos.checked_add(1) {
-                    if let Some(Field::Desert(_)) = self.data.get(&right) {
-                        continue;
-                    }
-                }
-
-                // create clone with desert at pos
-                let mut clone_map = self.data.clone();
-                clone_map.insert(pos, Field::Desert(tile));
-                let clone_state = State::new(clone_map);
-
-                let (_camel_counts, desert_counts) = clone_state.simulate_outcomes();
-                let hits = desert_counts.get(&pos).cloned().unwrap_or(0usize);
-                result.entry(pos).or_default().insert(tile, hits);
-            }
-        }
-
-        result
     }
 }
