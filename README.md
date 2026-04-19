@@ -1,11 +1,12 @@
 camel-up
 =========
 
-A small Rust library implementing a minimal model for a "camel cup" game:
-- Camel enum (WHITE, YELLOW, ORANGE, GREEN, BLUE)
-- State struct with a BTreeMap-based field layout and move logic
-- Combinatorics utilities: Permutations and Product iterators
-- Integration tests exercising combinatorics and state move semantics
+A small Rust library implementing a minimal model for a camel race game:
+ - Camel enum (White, Yellow, Orange, Green, Blue)
+ - State struct with a BTreeMap-based space layout (Space) and move logic
+   - Public API highlights: State::move_unit, State::move_multiple_units, State::simulate_outcomes, State::evaluate_desert_placements
+ - Combinatorics utilities: Permutations and Product iterators
+ - Integration tests exercising combinatorics and state move semantics
 
 Quickstart / Prerequisites
 --------------------------
@@ -54,8 +55,3 @@ Contact / License
 - Repository: https://github.com/msperr/camel-up
 - Add a LICENSE file (MIT/Apache2 suggested) if you want a clear open-source license.
 
-
-Recent changes
----------------
-- Repository renamed from camel-cup to camel-up.
-- Consolidated agent guidance and documentation updates.
