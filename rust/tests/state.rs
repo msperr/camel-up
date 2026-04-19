@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 fn mk_map(entries: &[(u8, Vec<Camel>)]) -> BTreeMap<u8, Field> {
     let mut m = BTreeMap::new();
     for (k, v) in entries {
-        m.insert(*k as u8, Field::Camels(v.clone()));
+        m.insert(*k, Field::Camels(v.clone()));
     }
     m
 }
