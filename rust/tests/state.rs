@@ -1,10 +1,10 @@
 use camel_cup::{Camel, Field, State};
 use std::collections::BTreeMap;
 
-fn mk_map(entries: &[(i32, Vec<Camel>)]) -> BTreeMap<i32, Field> {
+fn mk_map(entries: &[(u8, Vec<Camel>)]) -> BTreeMap<u8, Field> {
     let mut m = BTreeMap::new();
     for (k, v) in entries {
-        m.insert(*k, Field::Camels(v.clone()));
+        m.insert(*k as u8, Field::Camels(v.clone()));
     }
     m
 }
@@ -24,7 +24,7 @@ fn test_move_white_combinations() {
     let nv_green = vec![Camel::Green];
 
     // Helper to run a single scenario: initial map entries, expected map entries
-    let run = |initial_entries: &[(i32, Vec<Camel>)], expected_entries: &[(i32, Vec<Camel>)]| {
+    let run = |initial_entries: &[(u8, Vec<Camel>)], expected_entries: &[(u8, Vec<Camel>)]| {
         let state = State::new(mk_map(initial_entries));
         let (res_state, desert_hit) = state.move_camel(Camel::White, steps);
         assert_eq!(desert_hit, None);
@@ -101,7 +101,7 @@ fn test_move_all_camels_various_steps() {
     let state = State::new(mk_map(&initial));
 
     // Helper to assert expected map
-    let expect = |res_state: State, expected_entries: &[(i32, Vec<Camel>)]| {
+    let expect = |res_state: State, expected_entries: &[(u8, Vec<Camel>)]| {
         assert_eq!(res_state.data, mk_map(expected_entries));
     };
 
