@@ -9,6 +9,31 @@ A small Rust library implementing a minimal model for a camel race game:
  - Combinatorics utilities: Permutations and Product iterators
  - Integration tests exercising combinatorics and state move semantics
 
+Purpose
+-------
+This project helps a player playing Camel Up evaluate which action is the best
+and promises the highest number of coins. It models the coin-relevant mechanics
+so that candidate actions can be compared by their expected Egyptian Pound (EP)
+payout.
+
+The rules used for that evaluation are documented in [RULES.md](RULES.md). The
+current implementation models the 2014 base game; the rules document also
+summarises the 2018 and 2024 edition differences.
+
+Game rules
+----------
+- Official Camel Up (2014) rulebook, English (PDF):
+  https://cdn.1j1ju.com/medias/33/c8/d5-camel-up-rulebook.pdf
+- Cross-check (transcription):
+  https://www.ultraboardgames.com/camel-up/game-rules.php
+- Publisher page (current edition):
+  https://www.lookout-spiele.de/en/games/camelup.html
+- Full coin-relevant rules used by this repository: [RULES.md](RULES.md)
+
+> The rules document covers the full base game; not every rule is implemented in
+> the crate yet. The current Rust model covers camel movement/stacking and
+> desert tiles.
+
 Quickstart / Prerequisites
 --------------------------
 - Rust toolchain (rustup): https://rustup.rs
@@ -44,6 +69,7 @@ Repository Layout
     - combinatorics.rs
     - state.rs
 - AGENTS.md - contributor & agent guidance
+- RULES.md - coin-relevant Camel Up rules used by the project
 
 Contributing
 ------------

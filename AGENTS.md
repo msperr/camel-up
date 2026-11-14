@@ -63,6 +63,11 @@ High-value API facts (verify before changing code)
   - `State::simulate_outcomes(&self, already_moved: &[Camel])` and `State::evaluate_desert_placements()`
 - `simulate_outcomes` only simulates camels not listed in `already_moved`; passing all five camels panics because the leg is over.
 
+Rules compliance
+----------------
+- Verify in each implementation step, that the logic corresponds to the rules as documented.
+- The documented rules live in [RULES.md](RULES.md) (2014 base game; edition differences are noted there).
+
 Important invariants and behaviour
 ----------------------------------
 - Keys and steps use `u8` (valid keys 1..=16). Code uses checked_add/checked_sub; watch for over/underflow and preserve u8 semantics.
