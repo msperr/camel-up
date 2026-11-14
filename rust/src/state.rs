@@ -221,13 +221,31 @@ impl State {
         (state, counts)
     }
 
-    /// Simulate exhaustive outcomes by running all permutations of camels and all combinations of dice
-    /// choices = [1,2,3] repeated `num_camels` times.
+    /// Simulate exhaustive outcomes by running all permutations of the camels
+    /// that have not moved yet and all combinations of their dice (1, 2 or 3).
+    ///
+    /// `already_moved` contains the camels whose dice have already been revealed
+    /// during the current leg. `self` must already reflect those moves; the
+    /// listed camels are excluded from the simulation and only the remaining
+    /// camels are permuted and rolled. Passing an empty slice reproduces the
+    /// full-leg simulation.
+    ///
+    /// Rules note: a leg ends once all five racing dice have been revealed. At
+    /// that point the dice are returned to the pyramid and a new leg begins, so
+    /// there are no moves left to simulate. Passing all five camels is therefore
+    /// invalid.
+    ///
     /// Returns a tuple of:
     /// - map from Camel -> counts per position (Vec indexed by final position)
     /// - map from space key (u8) -> total desert hit counts across all simulations
+    ///
+    /// Panics if:
+    /// - `already_moved` contains a camel more than once
+    /// - all five camels have already moved (the leg is over)
+    /// - any Camel appears more or less than once in `self.data`
     pub fn simulate_outcomes(
         &self,
+        already_moved: &[Camel],
     ) -> (
         std::collections::BTreeMap<Camel, Vec<usize>>,
         std::collections::BTreeMap<u8, usize>,
@@ -241,6 +259,18 @@ impl State {
             Camel::Green,
             Camel::Blue,
         ];
+
+        // Reject duplicate entries: each camel's die can only be revealed once
+        // per leg.
+        for (i, &camel) in already_moved.iter().enumerate() {
+            if already_moved[..i].contains(&camel) {
+                panic!(
+                    "simulate_outcomes: camel {:?} appears multiple times in already_moved",
+                    camel
+                );
+            }
+        }
+
         // Preconditions: every Camel must appear exactly once in self.data
         for &camel in &camel_list {
             let occurrences: usize = self
@@ -253,12 +283,27 @@ impl State {
                 .sum();
             if occurrences != 1 {
                 panic!(
-                    "tally_outcomes requires each Camel to appear exactly once in state.data; camel {:?} appears {} times",
+                    "simulate_outcomes requires each Camel to appear exactly once in state.data; camel {:?} appears {} times",
                     camel, occurrences
                 );
             }
         }
+
+        // A leg is over as soon as the last camel has moved: the dice go back
+        // into the pyramid and there is nothing left to simulate.
+        let remaining: Vec<Camel> = camel_list
+            .iter()
+            .copied()
+            .filter(|camel| !already_moved.contains(camel))
+            .collect();
+        if remaining.is_empty() {
+            panic!(
+                "simulate_outcomes: all camels have already moved; the leg is over and there are no outcomes left to simulate"
+            );
+        }
+
         let num_camels = camel_list.len();
+        let num_remaining = remaining.len();
         let choices: Vec<u8> = vec![1, 2, 3];
 
         let mut counts = std::collections::BTreeMap::new();
@@ -269,12 +314,11 @@ impl State {
         let mut desert_counts: std::collections::BTreeMap<u8, usize> =
             std::collections::BTreeMap::new();
 
-        for perm in Permutations::new(camel_list.clone()) {
-            for comb in Product::new(choices.clone(), num_camels) {
+        for perm in Permutations::new(remaining) {
+            for comb in Product::new(choices.clone(), num_remaining) {
                 // Avoid allocating a Vec for each permutation+combination by passing the
                 // zipped iterator directly. `move_multiple_units` accepts any IntoIterator.
-                let (result, counts_map) =
-                    self.move_multiple_units(perm.iter().cloned().zip(comb.into_iter()));
+                let (result, counts_map) = self.move_multiple_units(perm.iter().cloned().zip(comb));
                 let order = result.order();
                 for (pos, &camel) in order.iter().enumerate() {
                     if let Some(v) = counts.get_mut(&camel) {
@@ -295,8 +339,8 @@ impl State {
     /// This mirrors: [c for _, y in sorted(self.data.items(), key=lambda s: s[0]) for c in y][::1]
     pub fn order(&self) -> Vec<Camel> {
         self.data
-            .iter()
-            .flat_map(|(_, f)| match f {
+            .values()
+            .flat_map(|f| match f {
                 Space::Camels(v) => v.to_vec(),
                 Space::Desert(_) => Vec::new(),
             })
@@ -351,7 +395,7 @@ impl State {
                 clone_map.insert(pos, Space::Desert(tile));
                 let clone_state = State::new(clone_map);
 
-                let (_camel_counts, desert_counts) = clone_state.simulate_outcomes();
+                let (_camel_counts, desert_counts) = clone_state.simulate_outcomes(&[]);
                 let hits = desert_counts.get(&pos).cloned().unwrap_or(0usize);
                 result.entry(pos).or_default().insert(tile, hits);
             }

@@ -44,7 +44,8 @@ High-value API facts (verify before changing code)
 - API renames to keep in mind:
   - `State::move_unit(&self, camel: Camel, steps: u8) -> (State, Option<u8>)`
   - `State::move_multiple_units` (accepts IntoIterator of (Camel,u8))
-  - `State::simulate_outcomes()` and `State::evaluate_desert_placements()`
+  - `State::simulate_outcomes(&self, already_moved: &[Camel])` and `State::evaluate_desert_placements()`
+- `simulate_outcomes` only simulates camels not listed in `already_moved`; passing all five camels panics because the leg is over.
 
 Important invariants and behaviour
 ----------------------------------
