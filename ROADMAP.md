@@ -1,5 +1,4 @@
-ROADMAP
-=======
+# ROADMAP
 
 Outstanding findings from the one-time verification of the existing Rust
 implementation against the rules documented in [RULES.md](RULES.md).
@@ -21,10 +20,10 @@ Classification
 
 At a glance
 -----------
-| Type | Wrong behaviour | Missing feature | Cosmetic | Total |
-|---|---:|---:|---:|---:|
-| Bug | 4 | 0 | 1 | 5 |
-| Feature | 0 | 9 | 0 | 9 |
+| Type | Wrong behaviour | Latent | Missing feature | Cosmetic | Total |
+|---|---:|---:|---:|---:|---:|
+| Bug | 3 | 1 | 0 | 1 | 5 |
+| Feature | 0 | 0 | 8 | 0 | 8 |
 
 Priority: **P0** blocks the repository purpose (evaluating actions by expected
 coins); **P1** is required for a usable evaluator; **P2** is completeness or
@@ -74,9 +73,9 @@ Bugs
 - **Type:** Bug
 - **Classification:** Wrong behaviour (incomplete enumeration)
 - **Where:** `State::evaluate_desert_placements`
-- **Finding:** The loop starts at `min_key` (the rearmost occupied space), so it
-  never considers empty spaces below the rearmost camel. Those spaces can be
-  legal desert placements.
+- **Finding:** The loop starts at `min_key` (the lowest occupied space), so it
+  never considers empty spaces below it. Those spaces can be legal desert
+  placements.
 - **Rules:** A desert tile may be placed on any empty space except space 1,
   provided it is not adjacent to another desert tile.
 - **Impact:** The API does not actually evaluate "each position"; in the 2014
@@ -89,14 +88,17 @@ Bugs
 ### B-04 — Space 1 is not explicitly excluded — P3
 
 - **Type:** Bug
-- **Classification:** Wrong behaviour (latent)
+- **Classification:** Latent
 - **Where:** `State::evaluate_desert_placements`
-- **Finding:** There is no explicit "not space 1" check. Normal game states have
-  a camel on space 1 during setup, so the occupancy check hides the problem; a
-  constructed state could place a desert tile on space 1.
+- **Finding:** There is no explicit "not space 1" check. The loop currently
+  starts at `min_key`, so in normal states it never proposes space 1; a
+  malformed state with a key below 1 (or a future fix that iterates from 1)
+  could. Normal setup can leave space 1 empty, so occupancy alone is not a
+  sufficient guard.
 - **Rules:** A desert tile may never be placed on space 1.
 - **Impact:** Only malformed/internal states are affected.
-- **Next step:** Add the explicit check and a regression test.
+- **Next step:** Add the explicit `pos != 1` check and a regression test. The
+  proposed B-03 range (`2..=16`) would also avoid this.
 
 ### B-05 — Stale panic message — P3
 
@@ -202,18 +204,6 @@ Features
 - **Next step:** Validate the dice range and the full desert invariant, or return
   a `Result` instead of panicking.
 
-### F-09 — 2018+ edition support — P2
-
-- **Type:** Feature
-- **Classification:** Missing feature (edition scope)
-- **Finding:** The current code models the 2014 base game. The 2018/2024 rules add
-  crazy camels, the grey die, spectator tiles, a fourth leg-betting ticket, and a
-  different racing palette; legs also end after 5 of 6 dice.
-- **Impact:** None for the stated 2014 scope. The model cannot evaluate later
-  editions without these additions.
-- **Next step:** Decide whether the project targets 2014 only. If not, add an
-  edition configuration and the corresponding state and scoring changes.
-
 Suggested order
 ---------------
 1. **Fix B-01 and B-02** — the current results can be wrong even for the
@@ -225,5 +215,4 @@ Suggested order
 4. **Add F-07** — make the evaluator valid for the final leg and mid-leg
    decisions.
 5. **Finish B-03, B-04, F-06, F-08** — completeness and robustness.
-6. **Decide F-09** — keep 2014 as the explicit scope or add later editions.
-7. **Clean up B-05** — cosmetic.
+6. **Clean up B-05** — cosmetic.

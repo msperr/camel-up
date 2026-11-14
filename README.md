@@ -11,14 +11,13 @@ A small Rust library implementing a minimal model for a camel race game:
 
 Purpose
 -------
-This project helps a player playing Camel Up evaluate which action is the best
-and promises the highest number of coins. It models the coin-relevant mechanics
-so that candidate actions can be compared by their expected Egyptian Pound (EP)
-payout.
+This project helps a Camel Up player evaluate which action has the highest
+expected Egyptian Pound (EP) payout. It models the coin-relevant mechanics so
+that candidate actions can be compared by expected EP.
 
-The rules used for that evaluation are documented in [RULES.md](RULES.md). The
-current implementation models the 2014 base game; the rules document also
-summarises the 2018 and 2024 edition differences.
+This repository covers the rules of the **2014 game**. The 2018 and later
+editions are out of scope; the rules used here are documented in
+[RULES.md](RULES.md).
 
 Game rules
 ----------
@@ -26,13 +25,11 @@ Game rules
   https://cdn.1j1ju.com/medias/33/c8/d5-camel-up-rulebook.pdf
 - Cross-check (transcription):
   https://www.ultraboardgames.com/camel-up/game-rules.php
-- Publisher page (current edition):
-  https://www.lookout-spiele.de/en/games/camelup.html
 - Full coin-relevant rules used by this repository: [RULES.md](RULES.md)
 
-> The rules document covers the full base game; not every rule is implemented in
-> the crate yet. The current Rust model covers camel movement/stacking and
-> desert tiles.
+> The rules document covers the coin-relevant parts of the 2014 base game; not
+> every rule is implemented in the crate yet. The current Rust model covers
+> camel movement/stacking and desert tiles.
 
 Quickstart / Prerequisites
 --------------------------
@@ -47,6 +44,7 @@ Build / Run / Test
 - Run all tests: `cargo test`
 - Run a single integration test file:
   - `cargo test --test combinatorics`
+  - `cargo test --test desert_tiles`
   - `cargo test --test state`
 - Run a single test by name (substring match): `cargo test <test_name>`
 - Run tests verbosely / show output: `cargo test -- --nocapture`
@@ -67,9 +65,11 @@ Repository Layout
     - combinatorics.rs
   - tests/
     - combinatorics.rs
+    - desert_tiles.rs
     - state.rs
 - AGENTS.md - contributor & agent guidance
 - RULES.md - coin-relevant Camel Up rules used by the project
+- ROADMAP.md - outstanding rules-verification findings
 
 Contributing
 ------------

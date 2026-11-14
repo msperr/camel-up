@@ -10,23 +10,19 @@ purpose and [AGENTS.md](AGENTS.md) for the rule-verification requirement.
 
 Scope and edition
 -----------------
-The primary ruleset is the **2014 base game** (5 racing camels, 5 racing dice,
-3 leg-betting tiles per camel, desert tiles). That is the edition whose
-movement and desert-tile model this repository currently implements.
+This repository covers the rules of the **2014 game** (5 racing camels, 5
+racing dice, 3 leg-betting tiles per camel, desert tiles). The 2018 and later
+editions are out of scope.
 
 Rules that do not affect the choice of action or the coin result — component
-art, table talk, tie-breaking seating trivia, and expansions — are intentionally
-omitted. The coin-relevant differences introduced by the 2018 and 2024 editions
-are summarised in [Edition differences](#edition-differences).
+art, table talk, and expansions — are intentionally omitted.
 
 Sources:
 
-- Official rulebook, English (2014, eggertspiele):  
+- Official rulebook, English (2014, eggertspiele):
   <https://cdn.1j1ju.com/medias/33/c8/d5-camel-up-rulebook.pdf>
-- Cross-checked against UltraBoardGames' transcription of the same rulebook:  
+- Cross-checked against UltraBoardGames' transcription of the same rulebook:
   <https://www.ultraboardgames.com/camel-up/game-rules.php>
-- Publisher page for the current edition:  
-  <https://www.lookout-spiele.de/en/games/camelup.html>
 
 > The links above are external. If a link moves, search for the rulebook by
 > title and edition; the rules below are the authoritative reference for this
@@ -39,8 +35,8 @@ Sources:
 - The bank pays and receives EP. Money is public, though it may be stacked.
 - **No player can go below 0 EP.** If a scoring round would take more EP than a
   player has, the excess loss is waived. This caps the downside of every bet.
-- EP can be exchanged one-for-one with the bank at any time; this has no effect
-  on the optimal action and is ignored below.
+- EP can be exchanged for equal-value coins and notes at any time; this has no
+  effect on the optimal action and is ignored below.
 
 2. Core movement and ranking concepts
 -------------------------------------
@@ -189,12 +185,12 @@ pyramid and move the matching camel.
 - If the camel unit lands on a desert tile, resolve the desert effect.
 - If the unit crosses the finish line, the race ends immediately.
 - A revealed die is removed from the pyramid for the rest of the leg.
-- Each pyramid ticket is worth **+1 EP at the next leg scoring**. Therefore this
-  action has a guaranteed +1 EP floor, plus whatever the movement does to the
-  value of your leg and overall bets.
+- Each pyramid ticket is worth **+1 EP at the next leg scoring**, so the ticket
+  itself is a guaranteed gain; the movement can also change the value of your
+  leg and overall bets, in either direction.
 
 A leg ends after the last pyramid ticket is taken and its die movement is
-resolved (all 5 dice in the 2014 game; see the edition note for 2018).
+resolved (all 5 dice in the 2014 game).
 
 8. Action 4 — Bet on the overall winner or loser
 ------------------------------------------------
@@ -272,8 +268,9 @@ When choosing an action, compare the expected change in your final EP:
 
 Important interactions:
 
-- A pyramid ticket is the only action with a guaranteed positive immediate
-  payout; its movement value depends on which bets you and your opponents hold.
+- A pyramid ticket is the only action that pays a guaranteed +1 EP at the next
+  leg scoring; the movement's value depends on which bets you and your
+  opponents hold and can outweigh that gain.
 - Leg bets are scored every leg and reset, whereas overall bets are scored once
   at the end of the race.
 - Desert-tile income is paid to the tile's owner, so an opponent's move can earn
@@ -281,39 +278,3 @@ Important interactions:
 - Because no player can fall below 0 EP, losses are capped; upside is not.
 - Hidden information matters: overall bets are face down, while leg-bet tiles
   and desert tiles are public.
-
-11. Edition differences
------------------------
-The repository currently models the 2014 base game. If you play a later edition,
-the following changes affect the coin calculations:
-
-**2018 (second edition)**
-
-- Adds two **crazy camels** (black and white) that move **counterclockwise** on a
-  grey die. Players cannot bet on them, and they are ignored for ranking and for
-  overall winner/loser scoring.
-- Adds a **sixth die** (the grey die). A leg ends when **5 of the 6 dice** have
-  been revealed, so one die remains in the pyramid.
-- There are **4 leg-betting tiles per camel**, stacked from top to bottom
-  **5, 3, 2, 2** (two 2-EP tiles).
-- A racing camel can land on a crazy camel and be carried backwards; a racing
-  camel carried over the finish line backwards counts as less advanced.
-- The Oasis/Mirage **desert tiles** become **spectator tiles** with
-  cheering/booing sides. The coin-relevant effect is unchanged: owner +1 EP, then
-  one space forward (cheering, on top) or backward (booing, underneath), with the
-  same placement restrictions.
-- The racing-camel palette changes: white becomes a crazy camel and purple/red
-  are racing colours. The 2014 White/Yellow/Orange/Green/Blue set modelled by
-  this repository is the first-edition palette.
-- Adds partnership cards for games with 6+ players. These let a partner copy one
-  leg/pyramid reward; they do not change the movement or betting formulas.
-
-**2024 reprint**
-
-- A reprint of the second edition with the same rules and spectator tiles.
-- Component change only: 80 coins (1- and 5-EP) replace coins plus paper money;
-  the scoring formulas are unchanged.
-- The overall-bet reward ladder remains 8, 5, 3, 2, 1, with −1 for wrong bets.
-
-If a rule in this document conflicts with the edition you are playing, use the
-edition's official rulebook and update this document together with the code.
