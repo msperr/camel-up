@@ -5,6 +5,7 @@ A small Rust library implementing a minimal model for a camel race game:
  - Camel enum (White, Yellow, Orange, Green, Blue)
  - State struct with a BTreeMap-based space layout (Space) and move logic
    - Public API highlights: State::move_unit, State::move_multiple_units, State::simulate_outcomes, State::evaluate_desert_placements
+   - `State::simulate_outcomes(&already_moved)` simulates only the camels that have not moved yet; pass an empty slice for a full leg. Passing all five camels panics because the leg is already over. In partial mode the returned desert counts cover only the remaining moves; hits from already-revealed moves are not included.
  - Combinatorics utilities: Permutations and Product iterators
  - Integration tests exercising combinatorics and state move semantics
 

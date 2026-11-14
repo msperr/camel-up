@@ -31,6 +31,22 @@ cargo fmt --all
 cargo fmt -- --check
 cargo clippy -- -D warnings
 
+Worktrees and branches
+---------------------
+- One task = one worktree + one new branch. Never reuse a worktree or branch for a second task.
+- Worktrees live inside the repo at `.worktrees/<name>/` (ignored via `/.worktrees/` in `.gitignore`).
+- Start a task from the primary checkout with an up-to-date `main`:
+  git switch main
+  git pull --ff-only
+  git worktree add -b <branch> .worktrees/<name> main
+  # then run the agent/session from that worktree directory
+- Do not create a worktree inside another worktree (no nested `.worktrees/`).
+- After the branch is merged, clean up from the primary checkout:
+  git worktree remove .worktrees/<name>
+  git branch -d <branch>
+  git worktree prune
+- Use `git worktree list` to see all worktrees; do not touch worktrees owned by other tasks.
+
 Repository layout & naming gotchas
 ---------------------------------
 - Repo name: `camel-up` (filesystem root). Crate name inside Rust manifest is `camel_up` (see rust/Cargo.toml). After this change imports should use `use camel_up::{...}`.
@@ -44,7 +60,8 @@ High-value API facts (verify before changing code)
 - API renames to keep in mind:
   - `State::move_unit(&self, camel: Camel, steps: u8) -> (State, Option<u8>)`
   - `State::move_multiple_units` (accepts IntoIterator of (Camel,u8))
-  - `State::simulate_outcomes()` and `State::evaluate_desert_placements()`
+  - `State::simulate_outcomes(&self, already_moved: &[Camel])` and `State::evaluate_desert_placements()`
+- `simulate_outcomes` only simulates camels not listed in `already_moved`; passing all five camels panics because the leg is over.
 
 Important invariants and behaviour
 ----------------------------------
