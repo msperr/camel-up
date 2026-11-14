@@ -239,6 +239,10 @@ impl State {
     /// - map from Camel -> counts per position (Vec indexed by final position)
     /// - map from space key (u8) -> total desert hit counts across all simulations
     ///
+    /// When `already_moved` is non-empty, the desert counts cover only the hits
+    /// caused by the remaining simulated moves. Hits from the already-revealed
+    /// moves are not included and must be accounted for by the caller.
+    ///
     /// Panics if:
     /// - `already_moved` contains a camel more than once
     /// - all five camels have already moved (the leg is over)

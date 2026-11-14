@@ -1,6 +1,5 @@
 use camel_up::{Camel, DesertTile, Space, State};
 use std::collections::BTreeMap;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 
 const ALL: [Camel; 5] = [
     Camel::White,
@@ -49,7 +48,9 @@ fn no_camels_moved_is_full_leg() {
 #[test]
 fn two_camels_moved_simulates_remaining_three() {
     let moved = [Camel::White, Camel::Yellow];
-    let (counts, _) = base_state().simulate_outcomes(&moved);
+    // Reflect the already-revealed moves in the state, as the API requires.
+    let (state, _) = base_state().move_multiple_units([(Camel::White, 1), (Camel::Yellow, 2)]);
+    let (counts, _) = state.simulate_outcomes(&moved);
 
     // 3! permutations * 3^3 dice combinations.
     const PARTIAL_TOTAL: usize = 162;
@@ -61,7 +62,14 @@ fn two_camels_moved_simulates_remaining_three() {
 #[test]
 fn four_camels_moved_simulates_remaining_one() {
     let moved = [Camel::White, Camel::Yellow, Camel::Orange, Camel::Green];
-    let (counts, _) = base_state().simulate_outcomes(&moved);
+    // Reflect the already-revealed moves in the state, as the API requires.
+    let (state, _) = base_state().move_multiple_units([
+        (Camel::White, 1),
+        (Camel::Yellow, 2),
+        (Camel::Orange, 3),
+        (Camel::Green, 1),
+    ]);
+    let (counts, _) = state.simulate_outcomes(&moved);
 
     // 1! permutation * 3^1 dice combinations.
     const PARTIAL_TOTAL: usize = 3;
@@ -111,41 +119,41 @@ fn partial_composition_matches_full_leg() {
 }
 
 #[test]
+#[should_panic(expected = "all camels have already moved")]
 fn all_camels_moved_panics() {
     let state = base_state();
     let all = ALL;
 
     // A leg ends once all five dice have been revealed, so there is no
     // remaining move to simulate.
-    let result = catch_unwind(AssertUnwindSafe(|| state.simulate_outcomes(&all)));
-    assert!(result.is_err());
+    state.simulate_outcomes(&all);
 }
 
 #[test]
+#[should_panic(expected = "appears multiple times in already_moved")]
 fn duplicate_already_moved_panics() {
     let state = base_state();
     let moved = [Camel::White, Camel::Orange, Camel::White];
 
-    let result = catch_unwind(AssertUnwindSafe(|| state.simulate_outcomes(&moved)));
-    assert!(result.is_err());
+    state.simulate_outcomes(&moved);
 }
 
 #[test]
+#[should_panic(expected = "camel Blue appears 0 times")]
 fn missing_camel_in_state_panics() {
     let mut map = base_map();
     map.remove(&6); // remove Blue
     let state = State::new(map);
 
-    let result = catch_unwind(AssertUnwindSafe(|| state.simulate_outcomes(&[])));
-    assert!(result.is_err());
+    state.simulate_outcomes(&[]);
 }
 
 #[test]
+#[should_panic(expected = "camel Blue appears 2 times")]
 fn duplicate_camel_in_state_panics() {
     let mut map = base_map();
     map.insert(7, Space::Camels(vec![Camel::Blue])); // Blue now appears twice
     let state = State::new(map);
 
-    let result = catch_unwind(AssertUnwindSafe(|| state.simulate_outcomes(&[])));
-    assert!(result.is_err());
+    state.simulate_outcomes(&[]);
 }
