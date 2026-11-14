@@ -9,6 +9,28 @@ A small Rust library implementing a minimal model for a camel race game:
  - Combinatorics utilities: Permutations and Product iterators
  - Integration tests exercising combinatorics and state move semantics
 
+Purpose
+-------
+This project helps a Camel Up player evaluate which action has the highest
+expected Egyptian Pound (EP) payout. It models the coin-relevant mechanics so
+that candidate actions can be compared by expected EP.
+
+This repository covers the rules of the **2014 game**. The 2018 and later
+editions are out of scope; the rules used here are documented in
+[RULES.md](RULES.md).
+
+Game rules
+----------
+- Official Camel Up (2014) rulebook, English (PDF):
+  https://cdn.1j1ju.com/medias/33/c8/d5-camel-up-rulebook.pdf
+- Cross-check (transcription):
+  https://www.ultraboardgames.com/camel-up/game-rules.php
+- Full coin-relevant rules used by this repository: [RULES.md](RULES.md)
+
+> The rules document covers the coin-relevant parts of the 2014 base game; not
+> every rule is implemented in the crate yet. The current Rust model covers
+> camel movement/stacking and desert tiles.
+
 Quickstart / Prerequisites
 --------------------------
 - Rust toolchain (rustup): https://rustup.rs
@@ -22,6 +44,7 @@ Build / Run / Test
 - Run all tests: `cargo test`
 - Run a single integration test file:
   - `cargo test --test combinatorics`
+  - `cargo test --test desert_tiles`
   - `cargo test --test state`
 - Run a single test by name (substring match): `cargo test <test_name>`
 - Run tests verbosely / show output: `cargo test -- --nocapture`
@@ -42,8 +65,11 @@ Repository Layout
     - combinatorics.rs
   - tests/
     - combinatorics.rs
+    - desert_tiles.rs
     - state.rs
 - AGENTS.md - contributor & agent guidance
+- RULES.md - coin-relevant Camel Up rules used by the project
+- ROADMAP.md - outstanding rules-verification findings
 
 Contributing
 ------------

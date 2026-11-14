@@ -63,10 +63,15 @@ High-value API facts (verify before changing code)
   - `State::simulate_outcomes(&self, already_moved: &[Camel])` and `State::evaluate_desert_placements()`
 - `simulate_outcomes` only simulates camels not listed in `already_moved`; passing all five camels panics because the leg is over.
 
+Rules compliance
+----------------
+- Verify at each implementation step that the logic corresponds to the rules as documented.
+- The documented rules live in [RULES.md](RULES.md) (2014 game only).
+
 Important invariants and behaviour
 ----------------------------------
 - Keys and steps use `u8` (valid keys 1..=16). Code uses checked_add/checked_sub; watch for over/underflow and preserve u8 semantics.
-- Desert tiles: Oasis forwards the moving unit, Mirage moves it back. Precondition: deserts must not be adjacent in the direction of the effect.
+- Desert tiles: Oasis forwards the moving unit, Mirage moves it back. Precondition: deserts must not be adjacent in either direction and never on space 1; the current code checks only the direction of the effect (see ROADMAP F-08).
 - Many functions panic on invalid input (e.g. move_unit when steps==0 or camel not found). Tests rely on these panics in places.
 
 Testing and debug tips
