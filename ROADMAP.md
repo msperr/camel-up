@@ -216,3 +216,124 @@ Suggested order
    decisions.
 5. **Finish B-03, B-04, F-06, F-08** — completeness and robustness.
 6. **Clean up B-05** — cosmetic.
+
+Frontend architecture decisions
+-------------------------------
+
+Decided 2026-11-14. These are product/architecture decisions, not
+implementation findings or work items.
+
+### D-01 — The frontend is a tracker, not an enforced game
+
+- The frontend supports decisions during a physical game. The user enters the
+  observed state: thrown dice, desert-tile placements, betting-card ownership,
+  and so on.
+- Commands validate rule invariants so that the state remains playable, but the
+  app does not act as a referee: it does not enforce turn order or require that
+  every entered change was a legal action in sequence.
+- Corrections and undo are part of the expected workflow.
+- Consequence: a full turn/action state machine is not required, but the game
+  layer still needs validation, scoring, and a way to correct state safely.
+
+### D-02 — Single-player perspective
+
+- The frontend is used by one player and evaluates actions from that player's
+  perspective: their cash, bets, tiles, and known information.
+- Opponents may be represented in the state, but the app is not an omniscient
+  or all-player advisor and does not produce recommendations for every player.
+- Opponents' hidden information, such as face-down overall bets, is not assumed
+  to be known unless the user enters it.
+
+### D-03 — Layered modular monolith
+
+- The frontend, backend, rules, and analysis are one locally deployed
+  application, not microservices.
+- Four layers with one dependency direction:
+  1. **Rules core**: existing pure movement/stacking/desert mechanics. No HTTP,
+     web, or API concepts.
+  2. **Game layer**: players, cash, phase, leg state, remaining dice, ticket and
+     card inventories, desert ownership, scoring, command validation, and undo.
+  3. **Analysis layer**: action candidates and expected coin outcomes.
+  4. **HTTP adapter**: DTOs, error mapping, the in-memory session, and static-file
+     serving.
+- The frontend depends on the API contract only. It has no rules implementation.
+- The existing `rust/` crate stays the rules core. Add the game and analysis
+  modules first; split them into workspace crates only when the boundaries are
+  proven.
+- Out of scope: database, authentication, WebSocket, SSR framework, and
+  microservices.
+
+### D-04 — Backend owns the authoritative session
+
+- A single Rust backend owns the one authoritative in-memory game state. Parallel
+  sessions and persistence are out of scope.
+- Snapshots carry a revision number. Commands include the revision they are based
+  on; stale commands are rejected. Every command validates, mutates, and
+  increments the revision; queries only derive results.
+- Commands return full snapshots. The state is small, and patches would add
+  reconciliation bugs without a benefit.
+- API representations must be explicit: dense spaces 1–16, camel stacks
+  bottom-to-top, and ranking 1st-to-last computed by the backend. Do not expose
+  the internal `BTreeMap`/enum representation or make the frontend infer order.
+- The backend must validate what the core does not enforce: dice values 1–3, one
+  die per camel per leg, desert placement restrictions, finish line, and camel
+  uniqueness. Panics must not escape HTTP handlers.
+- A stateless “send the full state with every command” API was considered and
+  rejected: canonical game state and analysis state could diverge, and browser
+  reload behaviour would move into the frontend.
+- State survives a browser refresh while the server runs; a server restart loses
+  the game, which is acceptable for session-only state.
+
+### D-05 — Analysis is separate from state changes
+
+- State changes must stay fast and synchronous. Action evaluation is a separate,
+  expensive query.
+- Analysis runs against a cloned snapshot, outside the session lock, in a
+  blocking/worker context. Results are cached by game revision and viewing
+  player, and invalidated by any command.
+- The UI uses an explicit analysis action or debounce, shows progress, and marks
+  results with the revision they belong to.
+- Analysis returns structured results: action, expected EP, component breakdown,
+  assumptions, and a warning when a result is approximate. A single opaque
+  “best action” number is not sufficient.
+- Exact enumeration is acceptable for the current leg. Multi-leg or race-end
+  analysis may require seeded Monte Carlo and must be labelled accordingly.
+- The existing simulation cannot yet answer the full question: it lacks partial
+  final legs, race-end handling, tile ownership, ticket/card scoring, and
+  player-perspective EP. The analysis layer must model these explicitly instead
+  of presenting `simulate_outcomes` as a complete evaluator.
+
+### D-06 — Frontend structure
+
+- TypeScript single-page app. Server state and UI-only state are kept separate:
+  the server snapshot is query-cached; selection, drag preview, and panel state
+  are local.
+- The board is rendered as SVG, not canvas. A static space-to-coordinate map
+  lives in the frontend; board presentation is not encoded in the Rust API.
+- Camel stacks render bottom-to-top with unambiguous z-order. Desert tiles show
+  type and owner. The ranking is supplied by the backend.
+- Legal desert spaces and legal actions come from the backend. The frontend may
+  highlight or disable controls, but it does not implement rules.
+- Drag-and-drop uses a dedicated library. On drop, send a command; on rejection,
+  revert and show the machine-readable reason.
+- A play mode (validated commands with analysis) and an edit/correction mode are
+  distinct. Corrections still validate board invariants.
+- Prefer custom vector artwork; do not use scanned board or component artwork
+  without checking licensing.
+- Plan for touch and larger targets because the app may run on a tablet next to
+  the physical board.
+
+### D-07 — Stack: language option A
+
+- Chosen stack: **Rust backend (Axum) + TypeScript SPA (React or Svelte, Vite) +
+  HTML/CSS/SVG**.
+- Generate TypeScript API types from the Rust DTOs (`ts-rs` or OpenAPI-based
+  generation) and check them in. The API contract must not be maintained twice.
+- Development: Vite proxies to the Rust server. Production: the Rust server
+  serves the built frontend and binds to `127.0.0.1`; no CORS setup and no second
+  production server.
+- Rejected alternatives: Rust-only WASM UI (weaker UI/drag-and-drop ecosystem),
+  Rust SSR with HTMX (weaker rich interaction), WASM-only with no backend
+  (conflicts with the backend requirement), Python/Node backend bridging to Rust
+  (extra FFI and packaging complexity on Windows), and a TypeScript rewrite of
+  the engine (duplicates rules and tests).
