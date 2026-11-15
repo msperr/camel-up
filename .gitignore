@@ -5,3 +5,9 @@
 *.rs.bk
 .DS_Store
 *.swp
+*.local
+
+# Frontend
+node_modules/
+/frontend/dist/
+/frontend/coverage/
