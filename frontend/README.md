@@ -15,9 +15,10 @@ Single-page TypeScript frontend for the Camel Up decision tracker.
 - The dice tray starts empty. Its plus button opens an add-die dialog with the
   colours that have not been thrown yet and the values 1, 2, or 3. A random icon
   fills both fields, OK appends the die to the next slot in throw order, and
-  Cancel closes the dialog. The tray holds at most one die per colour. A Clear
-  button below the board empties it again. All UI text is English.
-- No backend connection, no game state, and no rules logic yet.
+  Cancel, Escape, or the backdrop closes the dialog. The tray holds at most five
+  dice, one per colour. A Clear button below the board empties it again. All UI
+  text is English.
+- No backend connection, no board/game-model state, and no rules logic yet.
 
 The implementation follows the frontend architecture decisions in
 `ROADMAP.md` (D-01 to D-07; currently on the

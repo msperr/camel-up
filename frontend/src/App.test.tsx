@@ -85,6 +85,7 @@ describe("App", () => {
     expect(getDice(container)).toHaveLength(0);
     expect(addButton).toBeInTheDocument();
     expect(addButton).toHaveStyle({ left: "76.6%", top: "56.8%" });
+    expect(addButton.style.getPropertyValue("--add-die-size")).toBe("3cqw");
   });
 
   it("starts empty with Add die enabled and Clear disabled", () => {
@@ -92,11 +93,12 @@ describe("App", () => {
 
     expect(screen.getByRole("button", { name: "Add die" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Clear" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /roll/i })).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("No dice");
   });
 
   it("opens the add-die dialog with empty fields and a disabled OK button", async () => {
-    render(<App />);
+    const { container } = render(<App />);
 
     expect(screen.queryByRole("dialog", { name: "Add die" })).not.toBeInTheDocument();
 
@@ -106,12 +108,14 @@ describe("App", () => {
     expect(screen.getByLabelText("Colour")).toHaveValue("");
     expect(screen.getByLabelText("Value")).toHaveValue("");
     expect(screen.getByRole("button", { name: "OK" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Random die" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Randomize selection" })).toBeEnabled();
     expect(
-      screen.getByRole("button", { name: "Random die" }).querySelector("svg"),
+      screen.getByRole("button", { name: "Randomize selection" }).querySelector("svg"),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
-    await waitFor(() => expect(screen.getByRole("dialog", { name: "Add die" })).toHaveFocus());
+    expect(container.querySelector('[data-page-content="true"]')).toHaveAttribute("inert");
+    expect(document.body.style.overflow).toBe("hidden");
+    await waitFor(() => expect(screen.getByLabelText("Colour")).toHaveFocus());
   });
 
   it("offers every remaining colour and only the die values 1 to 3", () => {
@@ -152,7 +156,35 @@ describe("App", () => {
 
     expect(screen.queryByRole("dialog", { name: "Add die" })).not.toBeInTheDocument();
     expect(getDice(container)).toHaveLength(0);
+    expect(container.querySelector('[data-page-content="true"]')).not.toHaveAttribute("inert");
+    expect(document.body.style.overflow).toBe("");
     await waitFor(() => expect(screen.getByRole("button", { name: "Add die" })).toHaveFocus());
+  });
+
+  it("traps Tab focus inside the dialog", async () => {
+    render(<App />);
+
+    openDiceDialog();
+
+    const colour = screen.getByLabelText("Colour");
+    const cancel = screen.getByRole("button", { name: "Cancel" });
+
+    await waitFor(() => expect(colour).toHaveFocus());
+
+    fireEvent.keyDown(colour, { key: "Tab", shiftKey: true });
+    expect(cancel).toHaveFocus();
+
+    fireEvent.keyDown(cancel, { key: "Tab" });
+    expect(colour).toHaveFocus();
+  });
+
+  it("does not close when the dialog itself is clicked", () => {
+    render(<App />);
+
+    openDiceDialog();
+    fireEvent.click(screen.getByRole("dialog", { name: "Add die" }));
+
+    expect(screen.getByRole("dialog", { name: "Add die" })).toBeInTheDocument();
   });
 
   it("keeps throw order and offers only colours not yet thrown", () => {
@@ -194,7 +226,7 @@ describe("App", () => {
     const { container } = render(<App />);
 
     openDiceDialog();
-    fireEvent.click(screen.getByRole("button", { name: "Random die" }));
+    fireEvent.click(screen.getByRole("button", { name: "Randomize selection" }));
 
     expect(screen.getByLabelText("Colour")).toHaveValue("white");
     expect(screen.getByLabelText("Value")).toHaveValue("3");
@@ -250,6 +282,27 @@ describe("App", () => {
     expect(getDice(container)).toHaveLength(5);
   });
 
+  it("can clear a full tray and start adding again", () => {
+    const { container } = render(<App />);
+    const addButton = screen.getByRole("button", { name: "Add die" });
+
+    addDie("white", "1");
+    addDie("yellow", "2");
+    addDie("orange", "3");
+    addDie("green", "1");
+    addDie("blue", "2");
+
+    expect(addButton).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+
+    expect(getDice(container)).toHaveLength(0);
+    expect(addButton).toBeEnabled();
+
+    addDie("white", "1");
+
+    expect(getDiceColors(container)).toEqual(["white"]);
+  });
+
   it("clears every die and re-enables Add die", async () => {
     const { container } = render(<App />);
 
@@ -265,26 +318,31 @@ describe("App", () => {
   });
 
   it("closes the dialog on Escape and returns focus to Add die", async () => {
-    render(<App />);
+    const { container } = render(<App />);
     const addButton = screen.getByRole("button", { name: "Add die" });
 
     openDiceDialog();
+    chooseDie("green", "2");
     fireEvent.keyDown(document, { key: "Escape" });
 
     expect(screen.queryByRole("dialog", { name: "Add die" })).not.toBeInTheDocument();
+    expect(getDice(container)).toHaveLength(0);
     await waitFor(() => expect(addButton).toHaveFocus());
   });
 
-  it("closes the dialog when the backdrop is clicked", () => {
+  it("closes the dialog when the backdrop is clicked", async () => {
     const { container } = render(<App />);
 
     openDiceDialog();
+    chooseDie("orange", "3");
     const backdrop = container.querySelector(".dice-dialog-backdrop");
 
     expect(backdrop).not.toBeNull();
-    fireEvent.mouseDown(backdrop as Element);
+    fireEvent.click(backdrop as Element);
 
     expect(screen.queryByRole("dialog", { name: "Add die" })).not.toBeInTheDocument();
+    expect(getDice(container)).toHaveLength(0);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Add die" })).toHaveFocus());
   });
 
   it("renders small numbers only for the twelve non-corner fields", () => {
@@ -352,7 +410,7 @@ describe("App", () => {
     expect(screen.getByRole("dialog", { name: "Add die" })).toBeInTheDocument();
     expect(screen.getByText("Colour")).toBeInTheDocument();
     expect(screen.getByText("Value")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Random die" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Randomize selection" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "OK" })).toBeInTheDocument();
   });

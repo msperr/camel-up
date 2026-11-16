@@ -47,7 +47,11 @@ export const DICE_GAP = 26;
 /** The horizontal centre line of the dice row. */
 export const DICE_ROW_Y = DICE_TRAY.y + DICE_TRAY.height / 2;
 
-/** The add-die button sits in the tray's lower-right corner. */
+/**
+ * The add-die button sits in the tray's lower-right corner. Its size is the
+ * maximum rendered diameter in viewBox units; CSS scales it down on small boards
+ * and keeps a larger touch target around it.
+ */
 export const DICE_ADD_BUTTON = {
   x: 766,
   y: 568,

@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import {
   BOARD_SPACES,
   BOARD_VIEWBOX,
@@ -54,6 +60,13 @@ const PIPS: Record<DieValue, readonly (readonly [number, number])[]> = {
 
 const SLOT_CENTERS = getDiceRowCenters(MAX_DICE);
 const SLOT_ROTATIONS = [-8, 5, -3, 7, -6] as const;
+
+const FOCUSABLE_SELECTOR =
+  'button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
+
+const getFocusableElements = (container: HTMLElement): HTMLElement[] => [
+  ...container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+];
 
 type DieFaceProps = {
   readonly color: CamelColor;
@@ -149,6 +162,7 @@ export default function App() {
   const [focusAfterClose, setFocusAfterClose] = useState<"add" | "clear" | null>(null);
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const clearButtonRef = useRef<HTMLButtonElement>(null);
+  const colorSelectRef = useRef<HTMLSelectElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
   const remainingColors = CAMEL_COLORS.filter((color) => !dice.some((die) => die.color === color));
@@ -175,7 +189,7 @@ export default function App() {
       return;
     }
 
-    dialogRef.current?.focus();
+    colorSelectRef.current?.focus();
 
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -188,6 +202,57 @@ export default function App() {
 
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [canAddDie, isDialogOpen]);
+
+  useEffect(() => {
+    if (!isDialogOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isDialogOpen]);
+
+  const handleDialogKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Tab") {
+      return;
+    }
+
+    const dialog = dialogRef.current;
+
+    if (!dialog) {
+      return;
+    }
+
+    const focusable = getFocusableElements(dialog);
+
+    if (focusable.length === 0) {
+      event.preventDefault();
+      dialog.focus();
+      return;
+    }
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement;
+
+    if (!(active instanceof Node) || !dialog.contains(active)) {
+      event.preventDefault();
+      first.focus();
+      return;
+    }
+
+    if (event.shiftKey && (active === first || active === dialog)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   useEffect(() => {
     if (isDialogOpen || focusAfterClose === null) {
@@ -239,203 +304,207 @@ export default function App() {
   const addButtonStyle = {
     left: `${(DICE_ADD_BUTTON.x / BOARD_VIEWBOX.width) * 100}%`,
     top: `${(DICE_ADD_BUTTON.y / BOARD_VIEWBOX.height) * 100}%`,
-  };
+    "--add-die-size": `${(DICE_ADD_BUTTON.size / BOARD_VIEWBOX.width) * 100}cqw`,
+  } as CSSProperties;
 
   return (
     <main className="page">
-      <h1 className="sr-only">Camel Up board</h1>
+      <div className="page-content" inert={isDialogOpen} data-page-content="true">
+        <h1 className="sr-only">Camel Up board</h1>
 
-      <div className="game">
-        <div className="board-frame">
-          <svg
-            className="board"
-            viewBox={`0 0 ${BOARD_VIEWBOX.width} ${BOARD_VIEWBOX.height}`}
-            role="img"
-            aria-labelledby="board-title"
-            aria-describedby="board-desc"
-          >
-            <title id="board-title">Camel Up board</title>
-            <desc id="board-desc">
-              Square Camel Up board with five rows and five columns. Sixteen dark track spaces run
-              clockwise around the edge; space 1 is at the top middle, space 16 directly to its
-              left, and the checkered finish line sits between them. Small numbers appear on the
-              inner edges of the twelve non-corner spaces. The light central three by three panel
-              contains a centred three by one tray for five coloured dice and an add-die button.
-            </desc>
+        <div className="game">
+          <div className="board-frame">
+            <svg
+              className="board"
+              viewBox={`0 0 ${BOARD_VIEWBOX.width} ${BOARD_VIEWBOX.height}`}
+              role="img"
+              aria-labelledby="board-title"
+              aria-describedby="board-desc"
+            >
+              <title id="board-title">Camel Up board</title>
+              <desc id="board-desc">
+                Square Camel Up board with five rows and five columns. Sixteen dark track spaces run
+                clockwise around the edge; space 1 is at the top middle, space 16 directly to its
+                left, and the checkered finish line sits between them. Small numbers appear on the
+                inner edges of the twelve non-corner spaces. The light central three by three panel
+                contains a centred three by one tray for five coloured dice and an add-die button.
+              </desc>
 
-            <defs>
-              <filter id="die-shadow" x="-50%" y="-50%" width="200%" height="220%">
-                <feDropShadow
-                  dx="0"
-                  dy="4"
-                  stdDeviation="3"
-                  floodColor="#3a2d25"
-                  floodOpacity="0.28"
-                />
-              </filter>
-              <pattern id="finish-checker" width="10" height="10" patternUnits="userSpaceOnUse">
-                <rect width="10" height="10" fill="#f8efd8" />
-                <rect width="5" height="5" fill="#3a2d25" />
-                <rect x="5" y="5" width="5" height="5" fill="#3a2d25" />
-              </pattern>
-            </defs>
+              <defs>
+                <filter id="die-shadow" x="-50%" y="-50%" width="200%" height="220%">
+                  <feDropShadow
+                    dx="0"
+                    dy="4"
+                    stdDeviation="3"
+                    floodColor="#3a2d25"
+                    floodOpacity="0.28"
+                  />
+                </filter>
+                <pattern id="finish-checker" width="10" height="10" patternUnits="userSpaceOnUse">
+                  <rect width="10" height="10" fill="#f8efd8" />
+                  <rect width="5" height="5" fill="#3a2d25" />
+                  <rect x="5" y="5" width="5" height="5" fill="#3a2d25" />
+                </pattern>
+              </defs>
 
-            <rect width={BOARD_VIEWBOX.width} height={BOARD_VIEWBOX.height} fill="#e3b87a" />
+              <rect width={BOARD_VIEWBOX.width} height={BOARD_VIEWBOX.height} fill="#e3b87a" />
 
-            <g role="group" aria-label="Track spaces">
-              {BOARD_SPACES.map((space) => {
-                const number = getSpaceNumberPlacement(space);
+              <g role="group" aria-label="Track spaces">
+                {BOARD_SPACES.map((space) => {
+                  const number = getSpaceNumberPlacement(space);
 
-                return (
-                  <g
-                    key={space.space}
-                    role="group"
-                    aria-label={`Space ${space.space}`}
-                    data-space={space.space}
-                    data-column={space.column}
-                    data-row={space.row}
-                  >
-                    <rect
-                      x={space.x - space.width / 2}
-                      y={space.y - space.height / 2}
-                      width={space.width}
-                      height={space.height}
-                      className="space-tile"
-                      shapeRendering="crispEdges"
-                    />
-                    {number && (
-                      <text
-                        x={0}
-                        y={0}
-                        transform={`translate(${number.x} ${number.y}) rotate(${number.rotation})`}
-                        textAnchor="middle"
-                        dominantBaseline="central"
-                        className="space-number"
-                        data-number={space.space}
-                        data-rotation={number.rotation}
-                      >
-                        {space.space}
-                      </text>
-                    )}
-                  </g>
-                );
-              })}
-            </g>
-
-            <g aria-hidden="true" data-center-panel="true">
-              <rect
-                x={CENTER_PANEL.x}
-                y={CENTER_PANEL.y}
-                width={CENTER_PANEL.width}
-                height={CENTER_PANEL.height}
-                className="center-panel"
-                shapeRendering="crispEdges"
-              />
-
-              <rect
-                x={DICE_TRAY.x}
-                y={DICE_TRAY.y}
-                width={DICE_TRAY.width}
-                height={DICE_TRAY.height}
-                className="dice-tray"
-                data-dice-tray="true"
-                shapeRendering="crispEdges"
-              />
-
-              {Array.from({ length: MAX_DICE }, (_, index) => {
-                const die = dice[index];
-                const centerX = SLOT_CENTERS[index];
-
-                return (
-                  <g key={index} data-die-slot={index + 1}>
-                    {!die && (
+                  return (
+                    <g
+                      key={space.space}
+                      role="group"
+                      aria-label={`Space ${space.space}`}
+                      data-space={space.space}
+                      data-column={space.column}
+                      data-row={space.row}
+                    >
                       <rect
-                        x={centerX - DICE_SIZE / 2}
-                        y={DICE_ROW_Y - DICE_SIZE / 2}
-                        width={DICE_SIZE}
-                        height={DICE_SIZE}
-                        rx="14"
-                        className="die-slot"
+                        x={space.x - space.width / 2}
+                        y={space.y - space.height / 2}
+                        width={space.width}
+                        height={space.height}
+                        className="space-tile"
                         shapeRendering="crispEdges"
                       />
-                    )}
-                    {die && (
-                      <DieFace
-                        color={die.color}
-                        value={die.value}
-                        x={centerX}
-                        y={DICE_ROW_Y}
-                        rotation={SLOT_ROTATIONS[index]}
-                      />
-                    )}
-                  </g>
-                );
-              })}
-            </g>
+                      {number && (
+                        <text
+                          x={0}
+                          y={0}
+                          transform={`translate(${number.x} ${number.y}) rotate(${number.rotation})`}
+                          textAnchor="middle"
+                          dominantBaseline="central"
+                          className="space-number"
+                          data-number={space.space}
+                          data-rotation={number.rotation}
+                        >
+                          {space.space}
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
+              </g>
 
-            <g aria-hidden="true" data-finish-line="true">
+              <g aria-hidden="true" data-center-panel="true">
+                <rect
+                  x={CENTER_PANEL.x}
+                  y={CENTER_PANEL.y}
+                  width={CENTER_PANEL.width}
+                  height={CENTER_PANEL.height}
+                  className="center-panel"
+                  shapeRendering="crispEdges"
+                />
+
+                <rect
+                  x={DICE_TRAY.x}
+                  y={DICE_TRAY.y}
+                  width={DICE_TRAY.width}
+                  height={DICE_TRAY.height}
+                  className="dice-tray"
+                  data-dice-tray="true"
+                  shapeRendering="crispEdges"
+                />
+
+                {Array.from({ length: MAX_DICE }, (_, index) => {
+                  const die = dice[index];
+                  const centerX = SLOT_CENTERS[index];
+
+                  return (
+                    <g key={index} data-die-slot={index + 1}>
+                      {!die && (
+                        <rect
+                          x={centerX - DICE_SIZE / 2}
+                          y={DICE_ROW_Y - DICE_SIZE / 2}
+                          width={DICE_SIZE}
+                          height={DICE_SIZE}
+                          rx="14"
+                          className="die-slot"
+                          shapeRendering="crispEdges"
+                        />
+                      )}
+                      {die && (
+                        <DieFace
+                          color={die.color}
+                          value={die.value}
+                          x={centerX}
+                          y={DICE_ROW_Y}
+                          rotation={SLOT_ROTATIONS[index]}
+                        />
+                      )}
+                    </g>
+                  );
+                })}
+              </g>
+
+              <g aria-hidden="true" data-finish-line="true">
+                <rect
+                  x={FINISH_LINE.x - FINISH_LINE.width / 2}
+                  y={FINISH_LINE.y}
+                  width={FINISH_LINE.width}
+                  height={FINISH_LINE.height}
+                  fill="url(#finish-checker)"
+                  shapeRendering="crispEdges"
+                />
+              </g>
+
               <rect
-                x={FINISH_LINE.x - FINISH_LINE.width / 2}
-                y={FINISH_LINE.y}
-                width={FINISH_LINE.width}
-                height={FINISH_LINE.height}
-                fill="url(#finish-checker)"
+                x="2"
+                y="2"
+                width={BOARD_VIEWBOX.width - 4}
+                height={BOARD_VIEWBOX.height - 4}
+                fill="none"
+                stroke="#5b3520"
+                strokeWidth="4"
                 shapeRendering="crispEdges"
               />
-            </g>
+            </svg>
 
-            <rect
-              x="2"
-              y="2"
-              width={BOARD_VIEWBOX.width - 4}
-              height={BOARD_VIEWBOX.height - 4}
-              fill="none"
-              stroke="#5b3520"
-              strokeWidth="4"
-              shapeRendering="crispEdges"
-            />
-          </svg>
+            <button
+              ref={addButtonRef}
+              type="button"
+              className="add-die-button"
+              aria-label="Add die"
+              title="Add die"
+              data-add-die="true"
+              style={addButtonStyle}
+              onClick={openDialog}
+              disabled={!canAddDie}
+            >
+              <span aria-hidden="true">+</span>
+            </button>
+          </div>
 
-          <button
-            ref={addButtonRef}
-            type="button"
-            className="add-die-button"
-            aria-label="Add die"
-            title="Add die"
-            data-add-die="true"
-            style={addButtonStyle}
-            onClick={openDialog}
-            disabled={!canAddDie}
-          >
-            <span aria-hidden="true">+</span>
-          </button>
+          <div className="dice-controls" data-dice-controls="true">
+            <button
+              ref={clearButtonRef}
+              type="button"
+              className="dice-control-button clear-button"
+              onClick={clearDice}
+              disabled={!hasDice}
+            >
+              Clear
+            </button>
+          </div>
         </div>
 
-        <div className="dice-controls" data-dice-controls="true">
-          <button
-            ref={clearButtonRef}
-            type="button"
-            className="dice-control-button clear-button"
-            onClick={clearDice}
-            disabled={!hasDice}
-          >
-            Clear
-          </button>
-        </div>
+        <p className="sr-only" role="status" aria-live="polite" data-dice-status="true">
+          {diceStatus}
+        </p>
       </div>
-
-      <p className="sr-only" role="status" aria-live="polite" data-dice-status="true">
-        {diceStatus}
-      </p>
 
       {isDialogOpen && (
         <div
           className="dice-dialog-backdrop"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
+          onClick={(event) => {
+            if (event.button === 0 && event.target === event.currentTarget) {
               closeDialog();
             }
           }}
+          onKeyDown={handleDialogKeyDown}
         >
           <div
             ref={dialogRef}
@@ -451,6 +520,7 @@ export default function App() {
               <label htmlFor="dice-color">Colour</label>
               <select
                 id="dice-color"
+                ref={colorSelectRef}
                 value={selectedColor}
                 onChange={(event) => {
                   const color = CAMEL_COLORS.find((item) => item === event.target.value);
@@ -487,8 +557,8 @@ export default function App() {
               <button
                 type="button"
                 className="dialog-button dialog-button--secondary dialog-button--icon"
-                aria-label="Random die"
-                title="Random die"
+                aria-label="Randomize selection"
+                title="Randomize selection"
                 onClick={randomizeDie}
                 disabled={remainingColors.length === 0}
               >
