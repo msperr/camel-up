@@ -36,6 +36,7 @@ Quickstart / Prerequisites
 - Rust toolchain (rustup): https://rustup.rs
 - Install components:
   - rustfmt and clippy: `rustup component add rustfmt clippy`
+- Frontend: Node.js 22.12 or newer and npm
 - Ensure `gh` (GitHub CLI) is available for repo operations (optional)
 
 Build / Run / Test
@@ -54,6 +55,26 @@ Formatting / Linting
 - Format code: `cargo fmt --all`
 - Check formatting: `cargo fmt -- --check`
 - Lint with clippy (treat warnings as errors): `cargo clippy -- -D warnings`
+- Frontend: `cd frontend && npm run lint && npm run format:check`
+
+Frontend
+--------
+The frontend is a single-page TypeScript app (React + Vite) that currently
+renders only the centred square SVG board: the 16 dark Camel Up fields run
+clockwise around the light central panel, with small numbers on the inner edges
+and the pyramid with five coloured dice in the middle. It has no backend
+connection and no game rules yet. See [frontend/README.md](frontend/README.md).
+
+```sh
+cd frontend
+npm install
+npm run dev       # development server
+npm run build     # type-check and production build
+npm test          # unit and component tests
+```
+
+The frontend follows the repository's frontend architecture decisions
+(D-01 to D-07); see [frontend/README.md](frontend/README.md).
 
 Repository Layout
 -----------------
@@ -67,6 +88,14 @@ Repository Layout
     - combinatorics.rs
     - desert_tiles.rs
     - state.rs
+- frontend/
+  - index.html
+  - src/
+    - App.tsx - the single page and SVG board
+    - boardLayout.ts - static space-to-coordinate map
+    - main.tsx
+    - styles.css
+  - README.md - frontend setup and scope
 - AGENTS.md - contributor & agent guidance
 - RULES.md - coin-relevant Camel Up rules used by the project
 - ROADMAP.md - outstanding rules-verification findings

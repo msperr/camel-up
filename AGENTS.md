@@ -31,6 +31,17 @@ cargo fmt --all
 cargo fmt -- --check
 cargo clippy -- -D warnings
 
+# frontend (work in the frontend directory, Node.js >= 22.12)
+cd frontend
+npm install
+npm run dev
+npm run build
+npm run typecheck
+npm run lint
+npm run format:check
+npm test
+npm run test:watch
+
 Worktrees and branches
 ---------------------
 - One task = one worktree + one new branch. Never reuse a worktree or branch for a second task.
@@ -51,7 +62,9 @@ Repository layout & naming gotchas
 ---------------------------------
 - Repo name: `camel-up` (filesystem root). Crate name inside Rust manifest is `camel_up` (see rust/Cargo.toml). After this change imports should use `use camel_up::{...}`.
 - Primary crate: rust/ (Cargo.toml, src/, tests/). Treat `rust/` as the workspace package.
+- Frontend: frontend/ (TypeScript SPA, React + Vite). It is a separate npm package; do not add it to the Rust crate.
 - Public API is exported from rust/src/lib.rs: Camel, DesertTile, Space, State.
+- The frontend has no Camel Up rules implementation. Board presentation lives in frontend/src/boardLayout.ts; ranking and legal actions must come from the backend.
 
 High-value API facts (verify before changing code)
 -------------------------------------------------
