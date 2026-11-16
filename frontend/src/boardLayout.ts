@@ -47,6 +47,13 @@ export const DICE_GAP = 26;
 /** The horizontal centre line of the dice row. */
 export const DICE_ROW_Y = DICE_TRAY.y + DICE_TRAY.height / 2;
 
+/** The add-die button sits in the tray's lower-right corner. */
+export const DICE_ADD_BUTTON = {
+  x: 766,
+  y: 568,
+  size: 30,
+} as const;
+
 /**
  * Centre a row of dice in the tray. The first and last dice keep the same
  * distance from the tray's left and right edges.

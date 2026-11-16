@@ -50,6 +50,8 @@ body {
 }
 
 .board-frame {
+  position: relative;
+  container-type: inline-size;
   width: min(
     calc(100vw - 2 * var(--page-gutter)),
     calc(100svh - 2 * var(--page-gutter) - var(--controls-height) - var(--controls-gap)),
@@ -85,6 +87,58 @@ body {
   fill: #f7e7c7;
   stroke: #c9a26a;
   stroke-width: 2;
+}
+
+.die-slot {
+  fill: rgba(253, 242, 220, 0.62);
+  stroke: #c9a26a;
+  stroke-width: 2;
+  stroke-dasharray: 5 5;
+}
+
+.add-die-button {
+  position: absolute;
+  display: grid;
+  width: clamp(18px, 3cqw, 30px);
+  height: clamp(18px, 3cqw, 30px);
+  padding: 0;
+  place-items: center;
+  font: inherit;
+  font-size: clamp(16px, 2.2cqw, 24px);
+  font-weight: 800;
+  line-height: 1;
+  color: #fff7e8;
+  background: #7a4b28;
+  border: 1px solid #5b3520;
+  border-radius: 50%;
+  box-shadow: 0 4px 10px rgba(91, 53, 32, 0.28);
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
+}
+
+.add-die-button:hover:not(:disabled) {
+  background: #93603a;
+  box-shadow: 0 6px 14px rgba(91, 53, 32, 0.34);
+  transform: translate(-50%, -50%) scale(1.06);
+}
+
+.add-die-button:active:not(:disabled) {
+  transform: translate(-50%, -50%) scale(0.98);
+}
+
+.add-die-button:focus-visible {
+  outline: 3px solid #2f6f68;
+  outline-offset: 3px;
+}
+
+.add-die-button:disabled {
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.36;
 }
 
 .space-number {
@@ -142,17 +196,141 @@ body {
   opacity: 0.45;
 }
 
-.roll-button {
-  width: var(--controls-height);
-}
-
 .clear-button {
   padding: 0 18px;
 }
 
-.control-icon {
-  width: 22px;
-  height: 22px;
+.dice-dialog-backdrop {
+  position: fixed;
+  z-index: 10;
+  display: grid;
+  inset: 0;
+  padding: var(--page-gutter);
+  place-items: center;
+  background: rgba(37, 24, 15, 0.48);
+  backdrop-filter: blur(3px);
+}
+
+.dice-dialog {
+  width: min(360px, calc(100vw - 2 * var(--page-gutter)));
+  padding: 24px;
+  color: var(--ink);
+  background: #fdf2dc;
+  border: 2px solid #c9a26a;
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(37, 24, 15, 0.34);
+}
+
+.dice-dialog:focus {
+  outline: none;
+}
+
+.dice-dialog h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  letter-spacing: 0.02em;
+}
+
+.dice-dialog-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.dice-dialog-field label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #6b3f22;
+}
+
+.dice-dialog-field select {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 12px;
+  font: inherit;
+  color: var(--ink);
+  background: #fffaf0;
+  border: 1px solid #c9a26a;
+  border-radius: 10px;
+}
+
+.dice-dialog-field select:focus-visible {
+  outline: 3px solid #2f6f68;
+  outline-offset: 2px;
+}
+
+.dice-dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.dialog-button {
+  min-height: 42px;
+  padding: 0 18px;
+  font: inherit;
+  font-weight: 700;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
+}
+
+.dialog-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.dialog-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.dialog-button:focus-visible {
+  outline: 3px solid #2f6f68;
+  outline-offset: 2px;
+}
+
+.dialog-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.dialog-button--secondary {
+  color: var(--ink);
+  background: #fffaf0;
+  border-color: #c9a26a;
+}
+
+.dialog-button--secondary:hover:not(:disabled) {
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(91, 53, 32, 0.16);
+}
+
+.dialog-button--primary {
+  color: #fff7e8;
+  background: #7a4b28;
+  border-color: #5b3520;
+}
+
+.dialog-button--primary:hover:not(:disabled) {
+  background: #93603a;
+  box-shadow: 0 4px 12px rgba(91, 53, 32, 0.24);
+}
+
+.dialog-button--icon {
+  display: inline-grid;
+  width: 42px;
+  padding: 0;
+  place-items: center;
+}
+
+.dialog-icon {
+  width: 20px;
+  height: 20px;
 }
 
 .sr-only {

@@ -9,13 +9,14 @@ Single-page TypeScript frontend for the Camel Up decision tracker.
   16 dark Camel Up fields fill the outer ring without gaps; field 1 is at the
   top middle, field 16 directly to its left, and the checkered finish line runs
   along their shared edge. The light central 3 x 3 panel contains a centred
-  3 x 1 dice tray with five coloured dice. Only the twelve non-corner fields
+  3 x 1 dice tray with five empty slots. Only the twelve non-corner fields
   carry small numbers at their inner edge; the four corner fields are blank. It
   uses no scanned board or component artwork.
-- The dice tray starts with the values 1, 2, 3, 2, 1. A control bar below the
-  board has an icon-only Roll button that randomizes all five values and a Clear
-  button that empties the tray. Roll restores the five dice after clearing. All
-  UI text is English.
+- The dice tray starts empty. Its plus button opens an add-die dialog with the
+  colours that have not been thrown yet and the values 1, 2, or 3. A random icon
+  fills both fields, OK appends the die to the next slot in throw order, and
+  Cancel closes the dialog. The tray holds at most one die per colour. A Clear
+  button below the board empties it again. All UI text is English.
 - No backend connection, no game state, and no rules logic yet.
 
 The implementation follows the frontend architecture decisions in
@@ -55,7 +56,7 @@ Node.js 22.12 or newer is required.
 frontend/
   index.html
   src/
-    App.tsx           # the one page: SVG board, dice tray, and controls
+    App.tsx           # the one page: SVG board, dice tray, and add-die dialog
     boardLayout.ts    # static 5 x 5 space-to-coordinate map for spaces 1..16
     main.tsx
     styles.css

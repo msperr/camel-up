@@ -4,6 +4,7 @@ import {
   BOARD_VIEWBOX,
   CELL_SIZE,
   CENTER_PANEL,
+  DICE_ADD_BUTTON,
   DICE_GAP,
   DICE_ROW_Y,
   DICE_SIZE,
@@ -179,6 +180,23 @@ describe("board layout", () => {
   it("returns no dice positions for an empty row", () => {
     expect(getDiceRowCenters(0)).toEqual([]);
     expect(getDiceRowCenters(-1)).toEqual([]);
+  });
+
+  it("places the add-die button inside the tray's lower-right corner", () => {
+    const centers = getDiceRowCenters(5);
+    const lastDieRight = centers[centers.length - 1] + DICE_SIZE / 2;
+
+    expect(DICE_ADD_BUTTON).toEqual({ x: 766, y: 568, size: 30 });
+    expect(DICE_ADD_BUTTON.x + DICE_ADD_BUTTON.size / 2).toBeLessThanOrEqual(
+      DICE_TRAY.x + DICE_TRAY.width,
+    );
+    expect(DICE_ADD_BUTTON.y + DICE_ADD_BUTTON.size / 2).toBeLessThanOrEqual(
+      DICE_TRAY.y + DICE_TRAY.height,
+    );
+    expect(DICE_ADD_BUTTON.x - DICE_ADD_BUTTON.size / 2).toBeGreaterThan(lastDieRight);
+    expect(DICE_ADD_BUTTON.y - DICE_ADD_BUTTON.size / 2).toBeGreaterThan(
+      DICE_ROW_Y + DICE_SIZE / 2,
+    );
   });
 
   it("leaves exactly the four corner fields without numbers", () => {
