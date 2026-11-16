@@ -29,6 +29,39 @@ export const CENTER_PANEL = {
   height: CELL_SIZE * 3,
 } as const;
 
+/**
+ * The 3 x 1 dice band. It is vertically centred in the central panel, leaving
+ * an equal 200px gap above and below it.
+ */
+export const DICE_TRAY = {
+  x: CENTER_PANEL.x,
+  y: CENTER_PANEL.y + CENTER_PANEL.height / 3,
+  width: CENTER_PANEL.width,
+  height: CENTER_PANEL.height / 3,
+} as const;
+
+/** Five 72px dice with a 26px gap fit inside the 600px-wide tray. */
+export const DICE_SIZE = 72;
+export const DICE_GAP = 26;
+
+/** The horizontal centre line of the dice row. */
+export const DICE_ROW_Y = DICE_TRAY.y + DICE_TRAY.height / 2;
+
+/**
+ * Centre a row of dice in the tray. The first and last dice keep the same
+ * distance from the tray's left and right edges.
+ */
+export const getDiceRowCenters = (count: number): readonly number[] => {
+  if (count <= 0) {
+    return [];
+  }
+
+  const rowWidth = count * DICE_SIZE + (count - 1) * DICE_GAP;
+  const firstCenter = DICE_TRAY.x + (DICE_TRAY.width - rowWidth) / 2 + DICE_SIZE / 2;
+
+  return Array.from({ length: count }, (_, index) => firstCenter + index * (DICE_SIZE + DICE_GAP));
+};
+
 /** Distance from a field's inner edge to the centre of its small number. */
 export const NUMBER_EDGE_OFFSET = 20;
 

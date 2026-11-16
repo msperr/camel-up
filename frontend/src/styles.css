@@ -33,14 +33,28 @@ body {
 
 .page {
   --page-gutter: clamp(12px, 3vmin, 32px);
+  --controls-height: 44px;
+  --controls-gap: clamp(12px, 2vmin, 18px);
   display: grid;
   place-items: center;
   min-height: 100svh;
   padding: var(--page-gutter);
 }
 
+.game {
+  display: grid;
+  width: fit-content;
+  max-width: 100%;
+  justify-items: center;
+  gap: var(--controls-gap);
+}
+
 .board-frame {
-  width: min(calc(100vw - 2 * var(--page-gutter)), calc(100svh - 2 * var(--page-gutter)), 1000px);
+  width: min(
+    calc(100vw - 2 * var(--page-gutter)),
+    calc(100svh - 2 * var(--page-gutter) - var(--controls-height) - var(--controls-gap)),
+    1000px
+  );
   max-width: 100%;
   aspect-ratio: 1 / 1;
   background: var(--field);
@@ -55,21 +69,6 @@ body {
   height: 100%;
 }
 
-.board-title {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 44px;
-  font-weight: 700;
-  letter-spacing: 6px;
-  fill: #7a4b28;
-}
-
-.board-subtitle {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 4.5px;
-  fill: #a96732;
-}
-
 .space-tile {
   fill: var(--field);
   stroke: var(--grid);
@@ -82,11 +81,78 @@ body {
   stroke-width: 2;
 }
 
+.dice-tray {
+  fill: #f7e7c7;
+  stroke: #c9a26a;
+  stroke-width: 2;
+}
+
 .space-number {
   font-size: 22px;
   font-weight: 800;
   fill: var(--ink);
   font-variant-numeric: tabular-nums;
+}
+
+.dice-controls {
+  display: flex;
+  min-height: var(--controls-height);
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.dice-control-button {
+  display: inline-grid;
+  min-height: var(--controls-height);
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ink);
+  background: rgba(253, 242, 220, 0.95);
+  border: 1px solid #c9a26a;
+  border-radius: 12px;
+  box-shadow: 0 3px 10px rgba(91, 53, 32, 0.14);
+  cursor: pointer;
+  place-items: center;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
+}
+
+.dice-control-button:hover:not(:disabled) {
+  background: #fff8e9;
+  box-shadow: 0 5px 14px rgba(91, 53, 32, 0.2);
+  transform: translateY(-1px);
+}
+
+.dice-control-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.dice-control-button:focus-visible {
+  outline: 3px solid #2f6f68;
+  outline-offset: 2px;
+}
+
+.dice-control-button:disabled {
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.roll-button {
+  width: var(--controls-height);
+}
+
+.clear-button {
+  padding: 0 18px;
+}
+
+.control-icon {
+  width: 22px;
+  height: 22px;
 }
 
 .sr-only {
