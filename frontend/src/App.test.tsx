@@ -176,6 +176,18 @@ describe("App", () => {
 
     fireEvent.keyDown(cancel, { key: "Tab" });
     expect(colour).toHaveFocus();
+
+    chooseDie("green", "2");
+
+    const ok = screen.getByRole("button", { name: "OK" });
+
+    expect(ok).toBeEnabled();
+    ok.focus();
+    fireEvent.keyDown(ok, { key: "Tab" });
+    expect(colour).toHaveFocus();
+
+    fireEvent.keyDown(colour, { key: "Tab", shiftKey: true });
+    expect(ok).toHaveFocus();
   });
 
   it("does not close when the dialog itself is clicked", () => {
@@ -330,7 +342,7 @@ describe("App", () => {
     await waitFor(() => expect(addButton).toHaveFocus());
   });
 
-  it("closes the dialog when the backdrop is clicked", async () => {
+  it("closes the dialog on a primary backdrop press and ignores secondary presses", async () => {
     const { container } = render(<App />);
 
     openDiceDialog();
@@ -338,7 +350,10 @@ describe("App", () => {
     const backdrop = container.querySelector(".dice-dialog-backdrop");
 
     expect(backdrop).not.toBeNull();
-    fireEvent.click(backdrop as Element);
+    fireEvent.mouseDown(backdrop as Element, { button: 2 });
+    expect(screen.getByRole("dialog", { name: "Add die" })).toBeInTheDocument();
+
+    fireEvent.mouseDown(backdrop as Element, { button: 0 });
 
     expect(screen.queryByRole("dialog", { name: "Add die" })).not.toBeInTheDocument();
     expect(getDice(container)).toHaveLength(0);

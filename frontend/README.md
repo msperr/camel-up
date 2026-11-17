@@ -18,7 +18,7 @@ Single-page TypeScript frontend for the Camel Up decision tracker.
   Cancel, Escape, or the backdrop closes the dialog. The tray holds at most five
   dice, one per colour. A Clear button below the board empties it again. All UI
   text is English.
-- No backend connection, no board/game-model state, and no rules logic yet.
+- No backend connection, no game-model or rules state yet.
 
 The implementation follows the frontend architecture decisions in
 `ROADMAP.md` (D-01 to D-07; currently on the

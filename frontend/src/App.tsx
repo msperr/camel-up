@@ -499,7 +499,7 @@ export default function App() {
       {isDialogOpen && (
         <div
           className="dice-dialog-backdrop"
-          onClick={(event) => {
+          onMouseDown={(event) => {
             if (event.button === 0 && event.target === event.currentTarget) {
               closeDialog();
             }
