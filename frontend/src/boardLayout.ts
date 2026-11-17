@@ -59,6 +59,58 @@ export const DICE_ADD_BUTTON = {
 } as const;
 
 /**
+ * Camel pieces are side-view meeples. Five of them stack tightly inside one
+ * 200px field with a small margin above and below.
+ */
+export const CAMEL_WIDTH = 84;
+export const CAMEL_HEIGHT = 38;
+export const MAX_STACKED_CAMELS = 5;
+
+/**
+ * Camels that pass the finish line are drawn above the board, centred on the
+ * finish line so it is clear where they left the track. `y` is the baseline at
+ * the board's top edge; the stack grows upwards from there.
+ */
+export const FINISH_OVERFLOW = {
+  x: FINISH_LINE.x,
+  y: 0,
+} as const;
+
+/** A camel's centre point, in board viewBox coordinates. */
+export type CamelPlacement = {
+  readonly x: number;
+  readonly y: number;
+};
+
+/**
+ * Centre a stack of camels at a given point. The camels touch (no vertical
+ * gap) and keep the same size no matter how many are stacked.
+ */
+export const getCamelStackCenters = (
+  centerX: number,
+  centerY: number,
+  count: number,
+): readonly CamelPlacement[] => {
+  if (count <= 0) {
+    return [];
+  }
+
+  const stackTop = centerY - (count * CAMEL_HEIGHT) / 2;
+
+  return Array.from({ length: count }, (_, index) => ({
+    x: centerX,
+    y: stackTop + (index + 0.5) * CAMEL_HEIGHT,
+  }));
+};
+
+/** Place finished camels above the track, with the lowest one just outside it. */
+export const getFinishOverflowCenters = (count: number): readonly CamelPlacement[] =>
+  Array.from({ length: Math.max(0, count) }, (_, index) => ({
+    x: FINISH_OVERFLOW.x,
+    y: FINISH_OVERFLOW.y - (count - index - 0.5) * CAMEL_HEIGHT,
+  }));
+
+/**
  * Centre a row of dice in the tray. The first and last dice keep the same
  * distance from the tray's left and right edges.
  */
@@ -128,6 +180,20 @@ export const BOARD_SPACES: readonly BoardSpace[] = [
   createSpace(15, 1, 1),
   createSpace(16, 2, 1),
 ];
+
+/** Centre a camel stack in its field. */
+export const getSpaceCamelCenters = (
+  spaceNumber: number,
+  count: number,
+): readonly CamelPlacement[] => {
+  const space = BOARD_SPACES.find((item) => item.space === spaceNumber);
+
+  if (!space) {
+    return [];
+  }
+
+  return getCamelStackCenters(space.x, space.y, count);
+};
 
 export const isCornerSpace = (space: BoardSpace): boolean =>
   (space.column === 1 || space.column === GRID_SIZE) &&

@@ -15,6 +15,19 @@ const getDieSlots = (container: HTMLElement) => [
   ...container.querySelectorAll<SVGGElement>("[data-die-slot]"),
 ];
 
+const getCamels = (container: HTMLElement) => [
+  ...container.querySelectorAll<SVGGElement>("[data-camel]"),
+];
+
+const getCamelInfo = (container: HTMLElement) =>
+  getCamels(container).map((camel) => ({
+    color: camel.dataset.camel,
+    space: camel.dataset.space ?? null,
+    index: Number(camel.dataset.stackIndex),
+    finished: camel.dataset.finished === "true",
+    transform: camel.getAttribute("transform"),
+  }));
+
 const getSelectOptions = (label: string) =>
   [...screen.getByLabelText(label).querySelectorAll("option")]
     .map((option) => option.value)
@@ -33,6 +46,12 @@ const addDie = (color: string, value: string) => {
   openDiceDialog();
   chooseDie(color, value);
   fireEvent.click(screen.getByRole("button", { name: "OK" }));
+};
+
+const DIE_COLORS = ["white", "yellow", "orange", "green", "blue"] as const;
+
+const fillRound = (values: readonly string[]) => {
+  DIE_COLORS.forEach((color, index) => addDie(color, values[index]));
 };
 
 afterEach(() => {
@@ -93,6 +112,7 @@ describe("App", () => {
 
     expect(screen.getByRole("button", { name: "Add die" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Clear" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next round" })).toBeDisabled();
     expect(screen.queryByRole("button", { name: /roll/i })).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("No dice");
   });
@@ -271,7 +291,7 @@ describe("App", () => {
     expect(getDice(container)).toHaveLength(1);
   });
 
-  it("stops at five dice and moves focus to Clear", async () => {
+  it("stops at five dice and moves focus to Next round", async () => {
     const { container } = render(<App />);
     const addButton = screen.getByRole("button", { name: "Add die" });
 
@@ -285,8 +305,9 @@ describe("App", () => {
     expect(getDiceValues(container)).toEqual(["1", "2", "3", "1", "2"]);
     expect(addButton).toBeDisabled();
     expect(screen.getByRole("button", { name: "Clear" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Next round" })).toBeEnabled();
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Clear" })).toHaveFocus());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Next round" })).toHaveFocus());
 
     fireEvent.click(addButton);
 
@@ -428,5 +449,154 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Randomize selection" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "OK" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next round" })).toBeInTheDocument();
   });
+
+  it("starts with no camels on the field", () => {
+    const { container } = render(<App />);
+
+    expect(getCamels(container)).toHaveLength(0);
+    expect(container.querySelector('[data-camels="true"]')).toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent("No camels");
+  });
+
+  it("places a new camel at the die value, centred in the field", () => {
+    const { container } = render(<App />);
+
+    addDie("white", "1");
+
+    expect(getCamelInfo(container)).toEqual([
+      {
+        color: "white",
+        space: "1",
+        index: 0,
+        finished: false,
+        transform: "translate(500 100)",
+      },
+    ]);
+  });
+
+  it("stacks camels tightly with the newcomer on top", () => {
+    const { container } = render(<App />);
+
+    addDie("white", "1");
+    addDie("yellow", "1");
+
+    const camels = getCamelInfo(container);
+
+    expect(camels.map(({ color, index }) => [color, index])).toEqual([
+      ["white", 0],
+      ["yellow", 1],
+    ]);
+    expect(camels[0].transform).toBe("translate(500 81)");
+    expect(camels[1].transform).toBe("translate(500 119)");
+  });
+
+  it("keeps the camel shape unchanged when other camels stack on it", () => {
+    const { container } = render(<App />);
+
+    addDie("white", "1");
+    const whiteBefore = getCamels(container)[0].innerHTML;
+
+    addDie("yellow", "1");
+    addDie("orange", "1");
+
+    expect(getCamels(container)[0].innerHTML).toBe(whiteBefore);
+  });
+
+  it("enables Next round only with five dice, then clears dice but keeps camels", () => {
+    const { container } = render(<App />);
+    const nextRound = screen.getByRole("button", { name: "Next round" });
+
+    addDie("white", "1");
+    addDie("yellow", "1");
+    addDie("orange", "1");
+    addDie("green", "1");
+    expect(nextRound).toBeDisabled();
+
+    addDie("blue", "1");
+    expect(nextRound).toBeEnabled();
+
+    fireEvent.click(nextRound);
+
+    expect(getDice(container)).toHaveLength(0);
+    expect(getCamelInfo(container).map(({ color }) => color)).toEqual([
+      "white",
+      "yellow",
+      "orange",
+      "green",
+      "blue",
+    ]);
+    expect(nextRound).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Clear" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Add die" })).toBeEnabled();
+  });
+
+  it("moves a camel and its passengers when its die is thrown in the next round", () => {
+    const { container } = render(<App />);
+
+    addDie("white", "1");
+    addDie("yellow", "1");
+    addDie("orange", "2");
+    addDie("green", "2");
+    addDie("blue", "3");
+    fireEvent.click(screen.getByRole("button", { name: "Next round" }));
+
+    addDie("white", "1");
+
+    expect(getCamelInfo(container).map(({ color, space, index }) => [color, space, index])).toEqual(
+      [
+        ["orange", "2", 0],
+        ["green", "2", 1],
+        ["white", "2", 2],
+        ["yellow", "2", 3],
+        ["blue", "3", 0],
+      ],
+    );
+  });
+
+  it("lets Clear remove every camel and die", () => {
+    const { container } = render(<App />);
+
+    addDie("white", "1");
+    addDie("yellow", "1");
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+
+    expect(getCamels(container)).toHaveLength(0);
+    expect(getDice(container)).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Clear" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next round" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add die" })).toBeEnabled();
+  });
+
+  it("draws a camel that crosses the goal above the finish and locks the round", () => {
+    const { container } = render(<App />);
+
+    for (let round = 0; round < 5; round += 1) {
+      fillRound(["3", "1", "1", "1", "1"]);
+      fireEvent.click(screen.getByRole("button", { name: "Next round" }));
+    }
+
+    expect(getCamelInfo(container).find(({ color }) => color === "white")?.space).toBe("15");
+
+    addDie("white", "2");
+
+    const finished = getCamelInfo(container).filter(({ finished: isFinished }) => isFinished);
+
+    expect(finished).toHaveLength(1);
+    expect(finished[0]).toMatchObject({
+      color: "white",
+      space: null,
+      transform: "translate(400 -19)",
+    });
+    expect(screen.getByRole("button", { name: "Add die" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next round" })).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("Race finished");
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+
+    expect(getCamels(container)).toHaveLength(0);
+    expect(getDice(container)).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Add die" })).toBeEnabled();
+  }, 20000);
 });

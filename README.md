@@ -59,12 +59,15 @@ Formatting / Linting
 
 Frontend
 --------
-The frontend is a single-page TypeScript app (React + Vite) that currently
-renders the centred square SVG board: the 16 dark Camel Up fields run clockwise
-around the light central panel, with small numbers on the inner edges and a
-centred 3 x 1 tray with five empty dice slots. The tray's plus button opens an
-add-die dialog; Clear sits below the board. It has no backend connection and no
-game rules yet. See [frontend/README.md](frontend/README.md).
+The frontend is a single-page TypeScript app (React + Vite) that renders the
+centred square SVG board: the 16 dark Camel Up fields run clockwise around the
+light central panel, with small numbers on the inner edges and a centred 3 x 1
+tray with five dice slots. The tray's plus button opens an add-die dialog; each
+thrown die moves a coloured camel meeple onto the field, with camel-unit
+stacking and a finish-line overflow area. Clear removes dice and camels, while
+Next round clears only the dice once all five are on the field. Camel positions
+are local UI state; there is no backend connection yet. See
+[frontend/README.md](frontend/README.md).
 
 ```sh
 cd frontend
@@ -92,8 +95,9 @@ Repository Layout
 - frontend/
   - index.html
   - src/
-    - App.tsx - the single page, SVG board, dice tray, and add-die dialog
-    - boardLayout.ts - static space-to-coordinate map
+    - App.tsx - the single page, SVG board, dice, camels, and add-die dialog
+    - boardLayout.ts - static space-to-coordinate and camel-stack geometry
+    - camelRace.ts - local camel positions and die-driven movement
     - main.tsx
     - styles.css
   - README.md - frontend setup and scope
