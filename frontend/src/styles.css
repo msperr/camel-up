@@ -33,14 +33,34 @@ body {
 
 .page {
   --page-gutter: clamp(12px, 3vmin, 32px);
+  --controls-height: 44px;
+  --controls-gap: clamp(12px, 2vmin, 18px);
   display: grid;
   place-items: center;
   min-height: 100svh;
   padding: var(--page-gutter);
 }
 
+.page-content {
+  display: contents;
+}
+
+.game {
+  display: grid;
+  width: fit-content;
+  max-width: 100%;
+  justify-items: center;
+  gap: var(--controls-gap);
+}
+
 .board-frame {
-  width: min(calc(100vw - 2 * var(--page-gutter)), calc(100svh - 2 * var(--page-gutter)), 1000px);
+  position: relative;
+  container-type: inline-size;
+  width: min(
+    calc(100vw - 2 * var(--page-gutter)),
+    calc(100svh - 2 * var(--page-gutter) - var(--controls-height) - var(--controls-gap)),
+    1000px
+  );
   max-width: 100%;
   aspect-ratio: 1 / 1;
   background: var(--field);
@@ -55,21 +75,6 @@ body {
   height: 100%;
 }
 
-.board-title {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 44px;
-  font-weight: 700;
-  letter-spacing: 6px;
-  fill: #7a4b28;
-}
-
-.board-subtitle {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 4.5px;
-  fill: #a96732;
-}
-
 .space-tile {
   fill: var(--field);
   stroke: var(--grid);
@@ -82,11 +87,265 @@ body {
   stroke-width: 2;
 }
 
+.dice-tray {
+  fill: #f7e7c7;
+  stroke: #c9a26a;
+  stroke-width: 2;
+}
+
+.die-slot {
+  fill: rgba(253, 242, 220, 0.62);
+  stroke: #c9a26a;
+  stroke-width: 2;
+  stroke-dasharray: 5 5;
+}
+
+.add-die-button {
+  position: absolute;
+  display: grid;
+  width: max(16px, var(--add-die-size, 3cqw));
+  height: max(16px, var(--add-die-size, 3cqw));
+  padding: 0;
+  place-items: center;
+  font: inherit;
+  font-size: clamp(13px, calc(var(--add-die-size, 3cqw) * 0.75), 24px);
+  font-weight: 800;
+  line-height: 1;
+  color: #fff7e8;
+  background: #7a4b28;
+  border: 1px solid #5b3520;
+  border-radius: 50%;
+  box-shadow: 0 4px 10px rgba(91, 53, 32, 0.28);
+  cursor: pointer;
+  touch-action: manipulation;
+  transform: translate(-50%, -50%);
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
+}
+
+.add-die-button::before {
+  position: absolute;
+  content: "";
+  inset: -7px;
+  border-radius: 50%;
+}
+
+.add-die-button:hover:not(:disabled) {
+  background: #93603a;
+  box-shadow: 0 6px 14px rgba(91, 53, 32, 0.34);
+  transform: translate(-50%, -50%) scale(1.06);
+}
+
+.add-die-button:active:not(:disabled) {
+  transform: translate(-50%, -50%) scale(0.98);
+}
+
+.add-die-button:focus-visible {
+  outline: 3px solid #2f6f68;
+  outline-offset: 3px;
+}
+
+.add-die-button:disabled {
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.36;
+}
+
 .space-number {
   font-size: 22px;
   font-weight: 800;
   fill: var(--ink);
   font-variant-numeric: tabular-nums;
+}
+
+.dice-controls {
+  display: flex;
+  min-height: var(--controls-height);
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.dice-control-button {
+  display: inline-grid;
+  min-height: var(--controls-height);
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ink);
+  background: rgba(253, 242, 220, 0.95);
+  border: 1px solid #c9a26a;
+  border-radius: 12px;
+  box-shadow: 0 3px 10px rgba(91, 53, 32, 0.14);
+  cursor: pointer;
+  place-items: center;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
+}
+
+.dice-control-button:hover:not(:disabled) {
+  background: #fff8e9;
+  box-shadow: 0 5px 14px rgba(91, 53, 32, 0.2);
+  transform: translateY(-1px);
+}
+
+.dice-control-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.dice-control-button:focus-visible {
+  outline: 3px solid #2f6f68;
+  outline-offset: 2px;
+}
+
+.dice-control-button:disabled {
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.clear-button {
+  padding: 0 18px;
+}
+
+.dice-dialog-backdrop {
+  position: fixed;
+  z-index: 10;
+  display: grid;
+  inset: 0;
+  padding: var(--page-gutter);
+  place-items: center;
+  background: rgba(37, 24, 15, 0.48);
+  backdrop-filter: blur(3px);
+}
+
+.dice-dialog {
+  width: min(360px, calc(100vw - 2 * var(--page-gutter)));
+  max-height: calc(100svh - 2 * var(--page-gutter));
+  padding: 24px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  color: var(--ink);
+  background: #fdf2dc;
+  border: 2px solid #c9a26a;
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(37, 24, 15, 0.34);
+}
+
+.dice-dialog:focus {
+  outline: none;
+}
+
+.dice-dialog h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  letter-spacing: 0.02em;
+}
+
+.dice-dialog-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.dice-dialog-field label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #6b3f22;
+}
+
+.dice-dialog-field select {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 12px;
+  font: inherit;
+  color: var(--ink);
+  background: #fffaf0;
+  border: 1px solid #c9a26a;
+  border-radius: 10px;
+}
+
+.dice-dialog-field select:focus-visible {
+  outline: 3px solid #2f6f68;
+  outline-offset: 2px;
+}
+
+.dice-dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.dialog-button {
+  min-height: 42px;
+  padding: 0 18px;
+  font: inherit;
+  font-weight: 700;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
+}
+
+.dialog-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.dialog-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.dialog-button:focus-visible {
+  outline: 3px solid #2f6f68;
+  outline-offset: 2px;
+}
+
+.dialog-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.dialog-button--secondary {
+  color: var(--ink);
+  background: #fffaf0;
+  border-color: #c9a26a;
+}
+
+.dialog-button--secondary:hover:not(:disabled) {
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(91, 53, 32, 0.16);
+}
+
+.dialog-button--primary {
+  color: #fff7e8;
+  background: #7a4b28;
+  border-color: #5b3520;
+}
+
+.dialog-button--primary:hover:not(:disabled) {
+  background: #93603a;
+  box-shadow: 0 4px 12px rgba(91, 53, 32, 0.24);
+}
+
+.dialog-button--icon {
+  display: inline-grid;
+  width: 42px;
+  padding: 0;
+  place-items: center;
+}
+
+.dialog-icon {
+  width: 20px;
+  height: 20px;
 }
 
 .sr-only {

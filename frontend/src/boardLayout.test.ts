@@ -4,6 +4,11 @@ import {
   BOARD_VIEWBOX,
   CELL_SIZE,
   CENTER_PANEL,
+  DICE_ADD_BUTTON,
+  DICE_GAP,
+  DICE_ROW_Y,
+  DICE_SIZE,
+  DICE_TRAY,
   FINISH_AFTER_SPACE,
   FINISH_LINE,
   GRID_SIZE,
@@ -11,6 +16,7 @@ import {
   SPACE_HEIGHT,
   SPACE_WIDTH,
   START_SPACE,
+  getDiceRowCenters,
   getSpaceNumberPlacement,
   isCornerSpace,
   type BoardSpace,
@@ -129,6 +135,68 @@ describe("board layout", () => {
         expect(space.x + space.width / 2).toBe(CENTER_PANEL.x);
       }
     }
+  });
+
+  it("centres a 3 x 1 dice tray in the central panel with equal space above and below", () => {
+    expect(DICE_TRAY).toEqual({
+      x: CENTER_PANEL.x,
+      y: CENTER_PANEL.y + CENTER_PANEL.height / 3,
+      width: CENTER_PANEL.width,
+      height: CENTER_PANEL.height / 3,
+    });
+
+    const spaceAbove = DICE_TRAY.y - CENTER_PANEL.y;
+    const spaceBelow = CENTER_PANEL.y + CENTER_PANEL.height - (DICE_TRAY.y + DICE_TRAY.height);
+
+    expect(spaceAbove).toBe(200);
+    expect(spaceBelow).toBe(200);
+    expect(spaceAbove).toBe(spaceBelow);
+  });
+
+  it("centres five dice in the tray with equal side and vertical margins", () => {
+    const centers = getDiceRowCenters(5);
+
+    expect(centers).toEqual([304, 402, 500, 598, 696]);
+    expect(DICE_SIZE).toBe(72);
+    expect(DICE_GAP).toBe(26);
+    expect(DICE_ROW_Y).toBe(DICE_TRAY.y + DICE_TRAY.height / 2);
+
+    const rowWidth = 5 * DICE_SIZE + 4 * DICE_GAP;
+    const leftMargin = centers[0] - DICE_SIZE / 2 - DICE_TRAY.x;
+    const rightMargin =
+      DICE_TRAY.x + DICE_TRAY.width - (centers[centers.length - 1] + DICE_SIZE / 2);
+    const topMargin = DICE_ROW_Y - DICE_SIZE / 2 - DICE_TRAY.y;
+    const bottomMargin = DICE_TRAY.y + DICE_TRAY.height - (DICE_ROW_Y + DICE_SIZE / 2);
+
+    expect(rowWidth).toBe(464);
+    expect(leftMargin).toBe(68);
+    expect(rightMargin).toBe(68);
+    expect(leftMargin).toBe(rightMargin);
+    expect(topMargin).toBe(64);
+    expect(bottomMargin).toBe(64);
+    expect(topMargin).toBe(bottomMargin);
+  });
+
+  it("returns no dice positions for an empty row", () => {
+    expect(getDiceRowCenters(0)).toEqual([]);
+    expect(getDiceRowCenters(-1)).toEqual([]);
+  });
+
+  it("places the add-die button inside the tray's lower-right corner", () => {
+    const centers = getDiceRowCenters(5);
+    const lastDieRight = centers[centers.length - 1] + DICE_SIZE / 2;
+
+    expect(DICE_ADD_BUTTON).toEqual({ x: 766, y: 568, size: 30 });
+    expect(DICE_ADD_BUTTON.x + DICE_ADD_BUTTON.size / 2).toBeLessThanOrEqual(
+      DICE_TRAY.x + DICE_TRAY.width,
+    );
+    expect(DICE_ADD_BUTTON.y + DICE_ADD_BUTTON.size / 2).toBeLessThanOrEqual(
+      DICE_TRAY.y + DICE_TRAY.height,
+    );
+    expect(DICE_ADD_BUTTON.x - DICE_ADD_BUTTON.size / 2).toBeGreaterThan(lastDieRight);
+    expect(DICE_ADD_BUTTON.y - DICE_ADD_BUTTON.size / 2).toBeGreaterThan(
+      DICE_ROW_Y + DICE_SIZE / 2,
+    );
   });
 
   it("leaves exactly the four corner fields without numbers", () => {

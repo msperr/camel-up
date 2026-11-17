@@ -60,10 +60,11 @@ Formatting / Linting
 Frontend
 --------
 The frontend is a single-page TypeScript app (React + Vite) that currently
-renders only the centred square SVG board: the 16 dark Camel Up fields run
-clockwise around the light central panel, with small numbers on the inner edges
-and the pyramid with five coloured dice in the middle. It has no backend
-connection and no game rules yet. See [frontend/README.md](frontend/README.md).
+renders the centred square SVG board: the 16 dark Camel Up fields run clockwise
+around the light central panel, with small numbers on the inner edges and a
+centred 3 x 1 tray with five empty dice slots. The tray's plus button opens an
+add-die dialog; Clear sits below the board. It has no backend connection and no
+game rules yet. See [frontend/README.md](frontend/README.md).
 
 ```sh
 cd frontend
@@ -91,7 +92,7 @@ Repository Layout
 - frontend/
   - index.html
   - src/
-    - App.tsx - the single page and SVG board
+    - App.tsx - the single page, SVG board, dice tray, and add-die dialog
     - boardLayout.ts - static space-to-coordinate map
     - main.tsx
     - styles.css
