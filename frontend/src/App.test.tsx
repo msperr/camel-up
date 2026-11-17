@@ -476,7 +476,7 @@ describe("App", () => {
     ]);
   });
 
-  it("stacks camels tightly with the newcomer on top", () => {
+  it("stacks camels tightly with the first one below the newcomer", () => {
     const { container } = render(<App />);
 
     addDie("white", "1");
@@ -488,8 +488,8 @@ describe("App", () => {
       ["white", 0],
       ["yellow", 1],
     ]);
-    expect(camels[0].transform).toBe("translate(500 81)");
-    expect(camels[1].transform).toBe("translate(500 119)");
+    expect(camels[0].transform).toBe("translate(500 119)");
+    expect(camels[1].transform).toBe("translate(500 81)");
   });
 
   it("keeps the camel shape unchanged when other camels stack on it", () => {

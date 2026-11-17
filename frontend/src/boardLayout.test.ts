@@ -322,18 +322,18 @@ describe("camel layout", () => {
     expect(getCamelStackCenters(500, 100, 1)).toEqual([{ x: 500, y: 100 }]);
   });
 
-  it("stacks camels without a gap and centred as a group", () => {
+  it("stacks camels without a gap, first one lowest, centred as a group", () => {
     const centers = getCamelStackCenters(500, 100, MAX_STACKED_CAMELS);
 
-    expect(centers.map(({ y }) => y)).toEqual([24, 62, 100, 138, 176]);
+    expect(centers.map(({ y }) => y)).toEqual([176, 138, 100, 62, 24]);
 
     for (let index = 1; index < centers.length; index += 1) {
-      expect(centers[index].y - centers[index - 1].y).toBe(CAMEL_HEIGHT);
+      expect(centers[index - 1].y - centers[index].y).toBe(CAMEL_HEIGHT);
     }
 
     expect(centers.every(({ x }) => x === 500)).toBe(true);
-    expect(centers[0].y - CAMEL_HEIGHT / 2).toBeGreaterThanOrEqual(0);
-    expect(centers[centers.length - 1].y + CAMEL_HEIGHT / 2).toBeLessThanOrEqual(CELL_SIZE);
+    expect(centers[0].y + CAMEL_HEIGHT / 2).toBeLessThanOrEqual(CELL_SIZE);
+    expect(centers[centers.length - 1].y - CAMEL_HEIGHT / 2).toBeGreaterThanOrEqual(0);
   });
 
   it("returns no positions for an empty stack", () => {
@@ -354,9 +354,9 @@ describe("camel layout", () => {
     const centers = getFinishOverflowCenters(3);
 
     expect(centers.map(({ y }) => y)).toEqual([
-      -CAMEL_HEIGHT * 2.5,
-      -CAMEL_HEIGHT * 1.5,
       -CAMEL_HEIGHT * 0.5,
+      -CAMEL_HEIGHT * 1.5,
+      -CAMEL_HEIGHT * 2.5,
     ]);
     expect(centers.every(({ x }) => x === FINISH_LINE.x)).toBe(true);
   });

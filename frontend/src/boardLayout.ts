@@ -84,7 +84,9 @@ export type CamelPlacement = {
 
 /**
  * Centre a stack of camels at a given point. The camels touch (no vertical
- * gap) and keep the same size no matter how many are stacked.
+ * gap) and keep the same size no matter how many are stacked. Index 0 is the
+ * first camel to arrive and is drawn lowest; later camels sit above it and are
+ * painted last, so they visibly stand on top.
  */
 export const getCamelStackCenters = (
   centerX: number,
@@ -95,19 +97,17 @@ export const getCamelStackCenters = (
     return [];
   }
 
-  const stackTop = centerY - (count * CAMEL_HEIGHT) / 2;
-
   return Array.from({ length: count }, (_, index) => ({
     x: centerX,
-    y: stackTop + (index + 0.5) * CAMEL_HEIGHT,
+    y: centerY + ((count - 1) / 2 - index) * CAMEL_HEIGHT,
   }));
 };
 
-/** Place finished camels above the track, with the lowest one just outside it. */
+/** Place finished camels above the track, with the first one just outside it. */
 export const getFinishOverflowCenters = (count: number): readonly CamelPlacement[] =>
   Array.from({ length: Math.max(0, count) }, (_, index) => ({
     x: FINISH_OVERFLOW.x,
-    y: FINISH_OVERFLOW.y - (count - index - 0.5) * CAMEL_HEIGHT,
+    y: FINISH_OVERFLOW.y - (index + 0.5) * CAMEL_HEIGHT,
   }));
 
 /**
