@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   BOARD_SPACES,
   BOARD_VIEWBOX,
+  CAMEL_HEIGHT,
+  CAMEL_WIDTH,
   CELL_SIZE,
   CENTER_PANEL,
   DICE_ADD_BUTTON,
@@ -11,12 +13,17 @@ import {
   DICE_TRAY,
   FINISH_AFTER_SPACE,
   FINISH_LINE,
+  FINISH_OVERFLOW,
   GRID_SIZE,
+  MAX_STACKED_CAMELS,
   NUMBER_EDGE_OFFSET,
   SPACE_HEIGHT,
   SPACE_WIDTH,
   START_SPACE,
+  getCamelStackCenters,
   getDiceRowCenters,
+  getFinishOverflowCenters,
+  getSpaceCamelCenters,
   getSpaceNumberPlacement,
   isCornerSpace,
   type BoardSpace,
@@ -301,5 +308,56 @@ describe("board layout", () => {
   it("wraps from the finish line back to the start", () => {
     expect(START_SPACE).toBe(1);
     expect(FINISH_AFTER_SPACE).toBe(16);
+  });
+});
+
+describe("camel layout", () => {
+  it("sizes five camels so their tight stack fits inside one field", () => {
+    expect(MAX_STACKED_CAMELS).toBe(5);
+    expect(CAMEL_WIDTH).toBeLessThanOrEqual(CELL_SIZE);
+    expect(CAMEL_HEIGHT * MAX_STACKED_CAMELS).toBeLessThan(CELL_SIZE);
+  });
+
+  it("centres a single camel on its point", () => {
+    expect(getCamelStackCenters(500, 100, 1)).toEqual([{ x: 500, y: 100 }]);
+  });
+
+  it("stacks camels without a gap, first one lowest, centred as a group", () => {
+    const centers = getCamelStackCenters(500, 100, MAX_STACKED_CAMELS);
+
+    expect(centers.map(({ y }) => y)).toEqual([176, 138, 100, 62, 24]);
+
+    for (let index = 1; index < centers.length; index += 1) {
+      expect(centers[index - 1].y - centers[index].y).toBe(CAMEL_HEIGHT);
+    }
+
+    expect(centers.every(({ x }) => x === 500)).toBe(true);
+    expect(centers[0].y + CAMEL_HEIGHT / 2).toBeLessThanOrEqual(CELL_SIZE);
+    expect(centers[centers.length - 1].y - CAMEL_HEIGHT / 2).toBeGreaterThanOrEqual(0);
+  });
+
+  it("returns no positions for an empty stack", () => {
+    expect(getCamelStackCenters(500, 100, 0)).toEqual([]);
+  });
+
+  it("centres camel stacks in their field", () => {
+    expect(getSpaceCamelCenters(1, 1)).toEqual([{ x: 500, y: 100 }]);
+    expect(getSpaceCamelCenters(16, 3)).toEqual(getCamelStackCenters(300, 100, 3));
+    expect(getSpaceCamelCenters(99, 1)).toEqual([]);
+  });
+
+  it("places finished camels above the board, aligned with the finish line", () => {
+    expect(FINISH_OVERFLOW.x).toBe(FINISH_LINE.x);
+    expect(FINISH_OVERFLOW.y).toBe(0);
+    expect(getFinishOverflowCenters(1)).toEqual([{ x: FINISH_LINE.x, y: -CAMEL_HEIGHT / 2 }]);
+
+    const centers = getFinishOverflowCenters(3);
+
+    expect(centers.map(({ y }) => y)).toEqual([
+      -CAMEL_HEIGHT * 0.5,
+      -CAMEL_HEIGHT * 1.5,
+      -CAMEL_HEIGHT * 2.5,
+    ]);
+    expect(centers.every(({ x }) => x === FINISH_LINE.x)).toBe(true);
   });
 });

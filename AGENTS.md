@@ -64,7 +64,7 @@ Repository layout & naming gotchas
 - Primary crate: rust/ (Cargo.toml, src/, tests/). Treat `rust/` as the workspace package.
 - Frontend: frontend/ (TypeScript SPA, React + Vite). It is a separate npm package; do not add it to the Rust crate.
 - Public API is exported from rust/src/lib.rs: Camel, DesertTile, Space, State.
-- The frontend has no Camel Up rules implementation. Board presentation lives in frontend/src/boardLayout.ts; ranking and legal actions must come from the backend.
+- The frontend has no authoritative Camel Up rules implementation. Board presentation lives in frontend/src/boardLayout.ts; the camel movement in frontend/src/camelRace.ts is temporary presentation state until a backend API exists. Ranking and legal actions must come from the backend.
 
 High-value API facts (verify before changing code)
 -------------------------------------------------

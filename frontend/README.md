@@ -16,15 +16,24 @@ Single-page TypeScript frontend for the Camel Up decision tracker.
   colours that have not been thrown yet and the values 1, 2, or 3. A random icon
   fills both fields, OK appends the die to the next slot in throw order, and
   Cancel, Escape, or the backdrop closes the dialog. The tray holds at most five
-  dice, one per colour. A Clear button below the board empties it again. All UI
-  text is English.
-- No backend connection, no game-model or rules state yet.
+  dice, one per colour. Clear removes all dice and camels; Next round is enabled
+  only once all five dice are on the field and clears the dice while the camels
+  stay where they are. All UI text is English.
+- Side-view camel meeples in the dice colours appear at the die value when a die
+  is thrown. A camel already on that field stays below the newcomer; moving a
+  camel carries the camels above it and leaves those below behind. Five tight
+  camels fit in one field, centred without changing size. A camel that passes
+  space 16 is drawn above the finish line and locks the round: the plus button
+  and Next round are disabled until Clear resets the board.
+- No backend connection. Camel positions are temporary local UI state for
+  driving the SVG; the Rust crate remains the authoritative rules model.
 
 The implementation follows the frontend architecture decisions in
 `ROADMAP.md` (D-01 to D-07; currently on the
-`docs/frontend-architecture-decisions` branch): TypeScript SPA, React + Vite,
-SVG board, static space-to-coordinate map in the frontend, and the frontend
-depending on an API contract rather than implementing Camel Up rules.
+`docs/frontend-architecture-decisions` branch) for the TypeScript SPA, React +
+Vite setup, SVG board, and static space-to-coordinate map. The local movement
+in `camelRace.ts` is presentation scaffolding until the backend API (D-03 to
+D-07) exists; ranking and legal actions must still come from the backend.
 
 ## Stack
 
@@ -57,8 +66,9 @@ Node.js 22.12 or newer is required.
 frontend/
   index.html
   src/
-    App.tsx           # the one page: SVG board, dice tray, and add-die dialog
-    boardLayout.ts    # static 5 x 5 space-to-coordinate map for spaces 1..16
+    App.tsx           # the one page: SVG board, dice, camels, and add-die dialog
+    boardLayout.ts    # static 5 x 5 map and camel/stack geometry for spaces 1..16
+    camelRace.ts      # local camel positions and die-driven movement
     main.tsx
     styles.css
     test/setup.ts

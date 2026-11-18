@@ -15,20 +15,26 @@ import {
   DICE_TRAY,
   FINISH_LINE,
   getDiceRowCenters,
+  getFinishOverflowCenters,
+  getSpaceCamelCenters,
   getSpaceNumberPlacement,
 } from "./boardLayout";
-
-type DieValue = 1 | 2 | 3;
-
-type CamelColor = "white" | "yellow" | "orange" | "green" | "blue";
+import {
+  CAMEL_COLORS,
+  applyDie,
+  createRaceState,
+  hasCamels,
+  isRaceFinished,
+  type CamelColor,
+  type DieValue,
+  type RaceState,
+} from "./camelRace";
 
 type DieStyle = {
   readonly label: string;
   readonly color: string;
   readonly edge: string;
 };
-
-const CAMEL_COLORS: readonly CamelColor[] = ["white", "yellow", "orange", "green", "blue"];
 
 const CAMEL_DIE_STYLES: Record<CamelColor, DieStyle> = {
   white: { label: "White", color: "#fbf6ea", edge: "#7e6c55" },
@@ -120,6 +126,54 @@ function DieFace({ color, value, x, y, rotation }: DieFaceProps) {
   );
 }
 
+type CamelPieceProps = {
+  readonly color: CamelColor;
+  readonly x: number;
+  readonly y: number;
+  readonly space?: number;
+  readonly stackIndex: number;
+  readonly finished?: boolean;
+};
+
+/**
+ * A side-view camel meeple, drawn around its centre at (x, y). The silhouette
+ * stays inside the camel's fixed footprint so five fit in one board field.
+ */
+function CamelPiece({ color, x, y, space, stackIndex, finished = false }: CamelPieceProps) {
+  const style = CAMEL_DIE_STYLES[color];
+
+  return (
+    <g
+      data-camel={color}
+      data-space={space}
+      data-stack-index={stackIndex}
+      data-finished={finished ? "true" : undefined}
+      transform={`translate(${x} ${y})`}
+      filter="url(#camel-shadow)"
+    >
+      <g fill={style.color} stroke={style.edge} strokeWidth="1.6" strokeLinejoin="round">
+        <path
+          d="M -27 1 q -7 2 -9 9"
+          fill="none"
+          stroke={style.edge}
+          strokeWidth="2.6"
+          strokeLinecap="round"
+        />
+        <rect x={-26} y={5} width={6} height={13} rx={2} />
+        <rect x={-13} y={5} width={6} height={13} rx={2} />
+        <rect x={4} y={5} width={6} height={13} rx={2} />
+        <rect x={16} y={5} width={6} height={13} rx={2} />
+        <ellipse cx={-2} cy={3} rx={25} ry={9} />
+        <path d="M -22 -3 C -18 -18 -4 -18 2 -4 Z" />
+        <path d="M 12 2 C 17 -3 18 -13 24 -15 L 30 -15 L 30 -10 L 26 -9 C 24 -8 23 -3 22 3 Z" />
+        <ellipse cx={29} cy={-13} rx={6} ry={4.5} />
+        <path d="M 26 -16 l 2 -3 2 3 Z" />
+      </g>
+      <circle cx={31} cy={-14} r={1.1} fill="#33261d" />
+    </g>
+  );
+}
+
 function RandomIcon() {
   return (
     <svg className="dialog-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -154,22 +208,33 @@ function RandomIcon() {
   );
 }
 
+type FocusTarget = "add" | "clear" | "next";
+
 export default function App() {
   const [dice, setDice] = useState<readonly ThrownDie[]>([]);
+  const [race, setRace] = useState<RaceState>(createRaceState);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedColor, setSelectedColor] = useState<CamelColor | "">("");
   const [selectedValue, setSelectedValue] = useState<DieValue | "">("");
-  const [focusAfterClose, setFocusAfterClose] = useState<"add" | "clear" | null>(null);
+  const [focusAfterClose, setFocusAfterClose] = useState<FocusTarget | null>(null);
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const clearButtonRef = useRef<HTMLButtonElement>(null);
+  const nextRoundButtonRef = useRef<HTMLButtonElement>(null);
   const colorSelectRef = useRef<HTMLSelectElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
   const remainingColors = CAMEL_COLORS.filter((color) => !dice.some((die) => die.color === color));
-  const canAddDie = remainingColors.length > 0;
+  const raceFinished = isRaceFinished(race);
+  const camelsOnBoard = hasCamels(race);
   const hasDice = dice.length > 0;
+  const canAddDie = remainingColors.length > 0 && !raceFinished;
+  const canStartNextRound = dice.length === MAX_DICE && !raceFinished;
+  const canClear = hasDice || camelsOnBoard;
 
-  const closeDialog = (focusTarget: "add" | "clear" = canAddDie ? "add" : "clear") => {
+  const defaultFocusTarget = (): FocusTarget =>
+    canAddDie ? "add" : canStartNextRound ? "next" : "clear";
+
+  const closeDialog = (focusTarget: FocusTarget = defaultFocusTarget()) => {
     setFocusAfterClose(focusTarget);
     setIsDialogOpen(false);
   };
@@ -193,7 +258,7 @@ export default function App() {
 
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") {
-        setFocusAfterClose(canAddDie ? "add" : "clear");
+        setFocusAfterClose(canAddDie ? "add" : canStartNextRound ? "next" : "clear");
         setIsDialogOpen(false);
       }
     };
@@ -201,7 +266,7 @@ export default function App() {
     document.addEventListener("keydown", handleKeyDown);
 
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [canAddDie, isDialogOpen]);
+  }, [canAddDie, canStartNextRound, isDialogOpen]);
 
   useEffect(() => {
     if (!isDialogOpen) {
@@ -259,7 +324,12 @@ export default function App() {
       return;
     }
 
-    const target = focusAfterClose === "add" ? addButtonRef.current : clearButtonRef.current;
+    const target =
+      focusAfterClose === "add"
+        ? addButtonRef.current
+        : focusAfterClose === "next"
+          ? nextRoundButtonRef.current
+          : clearButtonRef.current;
 
     target?.focus();
     setFocusAfterClose(null);
@@ -287,12 +357,29 @@ export default function App() {
     }
 
     const willFillTray = dice.length + 1 >= MAX_DICE;
+    const nextRace = applyDie(race, selectedColor, selectedValue);
+    const focusTarget: FocusTarget = isRaceFinished(nextRace)
+      ? "clear"
+      : willFillTray
+        ? "next"
+        : "add";
 
     setDice((currentDice) => [...currentDice, { color: selectedColor, value: selectedValue }]);
-    closeDialog(willFillTray ? "clear" : "add");
+    setRace(nextRace);
+    closeDialog(focusTarget);
   };
 
-  const clearDice = () => {
+  const clearBoard = () => {
+    setDice([]);
+    setRace(createRaceState());
+    setFocusAfterClose("add");
+  };
+
+  const startNextRound = () => {
+    if (!canStartNextRound) {
+      return;
+    }
+
     setDice([]);
     setFocusAfterClose("add");
   };
@@ -301,11 +388,41 @@ export default function App() {
     ? `Dice: ${dice.map((die) => `${CAMEL_DIE_STYLES[die.color].label} ${die.value}`).join(", ")}.`
     : "No dice";
 
+  const camelPositions = BOARD_SPACES.flatMap((space) =>
+    (race.stacks[space.space] ?? []).map(
+      (color) => `${CAMEL_DIE_STYLES[color].label} on ${space.space}`,
+    ),
+  );
+
+  const camelStatus = raceFinished
+    ? `Race finished: ${race.finished?.map((color) => CAMEL_DIE_STYLES[color].label).join(", ")} past the finish line.`
+    : camelPositions.length > 0
+      ? `Camels: ${camelPositions.join(", ")}.`
+      : "No camels";
+
   const addButtonStyle = {
     left: `${(DICE_ADD_BUTTON.x / BOARD_VIEWBOX.width) * 100}%`,
     top: `${(DICE_ADD_BUTTON.y / BOARD_VIEWBOX.height) * 100}%`,
     "--add-die-size": `${(DICE_ADD_BUTTON.size / BOARD_VIEWBOX.width) * 100}cqw`,
   } as CSSProperties;
+
+  const camelPieces = BOARD_SPACES.flatMap((space) => {
+    const stack = race.stacks[space.space] ?? [];
+    const centers = getSpaceCamelCenters(space.space, stack.length);
+
+    return stack.map((color, index) => (
+      <CamelPiece
+        key={`${space.space}-${index}-${color}`}
+        color={color}
+        x={centers[index].x}
+        y={centers[index].y}
+        space={space.space}
+        stackIndex={index}
+      />
+    ));
+  });
+
+  const finishedCenters = race.finished ? getFinishOverflowCenters(race.finished.length) : [];
 
   return (
     <main className="page">
@@ -326,7 +443,9 @@ export default function App() {
                 Square Camel Up board with five rows and five columns. Sixteen dark track spaces run
                 clockwise around the edge; space 1 is at the top middle, space 16 directly to its
                 left, and the checkered finish line sits between them. Small numbers appear on the
-                inner edges of the twelve non-corner spaces. The light central three by three panel
+                inner edges of the twelve non-corner spaces. Coloured camel pieces stand on the
+                fields, stacked tightly when they share one. A camel that passes the finish line is
+                drawn just above it, outside the track. The light central three by three panel
                 contains a centred three by one tray for five coloured dice and an add-die button.
               </desc>
 
@@ -338,6 +457,15 @@ export default function App() {
                     stdDeviation="3"
                     floodColor="#3a2d25"
                     floodOpacity="0.28"
+                  />
+                </filter>
+                <filter id="camel-shadow" x="-30%" y="-30%" width="160%" height="180%">
+                  <feDropShadow
+                    dx="0"
+                    dy="2"
+                    stdDeviation="1.5"
+                    floodColor="#3a2d25"
+                    floodOpacity="0.25"
                   />
                 </filter>
                 <pattern id="finish-checker" width="10" height="10" patternUnits="userSpaceOnUse">
@@ -451,6 +579,27 @@ export default function App() {
                 />
               </g>
 
+              {camelPieces.length > 0 && (
+                <g aria-hidden="true" data-camels="true">
+                  {camelPieces}
+                </g>
+              )}
+
+              {race.finished && (
+                <g aria-hidden="true" data-finished-camels="true">
+                  {race.finished.map((color, index) => (
+                    <CamelPiece
+                      key={`finished-${index}-${color}`}
+                      color={color}
+                      x={finishedCenters[index].x}
+                      y={finishedCenters[index].y}
+                      stackIndex={index}
+                      finished
+                    />
+                  ))}
+                </g>
+              )}
+
               <rect
                 x="2"
                 y="2"
@@ -483,16 +632,25 @@ export default function App() {
               ref={clearButtonRef}
               type="button"
               className="dice-control-button clear-button"
-              onClick={clearDice}
-              disabled={!hasDice}
+              onClick={clearBoard}
+              disabled={!canClear}
             >
               Clear
+            </button>
+            <button
+              ref={nextRoundButtonRef}
+              type="button"
+              className="dice-control-button next-round-button"
+              onClick={startNextRound}
+              disabled={!canStartNextRound}
+            >
+              Next round
             </button>
           </div>
         </div>
 
         <p className="sr-only" role="status" aria-live="polite" data-dice-status="true">
-          {diceStatus}
+          {diceStatus} {camelStatus}
         </p>
       </div>
 
