@@ -14,8 +14,13 @@ import {
   DICE_SIZE,
   DICE_TRAY,
   FINISH_LINE,
+  LEG_BET_BAND,
+  LEG_BET_CARD_SIZE,
+  LEG_BET_STACK_COUNT,
   getDiceRowCenters,
   getFinishOverflowCenters,
+  getLegBetCardPlacements,
+  getLegBetStackCenters,
   getSpaceCamelCenters,
   getSpaceNumberPlacement,
 } from "./boardLayout";
@@ -29,6 +34,14 @@ import {
   type DieValue,
   type RaceState,
 } from "./camelRace";
+import {
+  LEG_BET_VALUES,
+  createLegBetState,
+  hasTakenLegBet,
+  takeLegBet,
+  type LegBetState,
+  type LegBetValue,
+} from "./legBets";
 
 type DieStyle = {
   readonly label: string;
@@ -66,6 +79,7 @@ const PIPS: Record<DieValue, readonly (readonly [number, number])[]> = {
 
 const SLOT_CENTERS = getDiceRowCenters(MAX_DICE);
 const SLOT_ROTATIONS = [-8, 5, -3, 7, -6] as const;
+const LEG_BET_CENTERS = getLegBetStackCenters(LEG_BET_STACK_COUNT);
 
 const FOCUSABLE_SELECTOR =
   'button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
@@ -135,6 +149,36 @@ type CamelPieceProps = {
   readonly finished?: boolean;
 };
 
+type CamelSilhouetteProps = {
+  readonly color: string;
+  readonly edge: string;
+};
+
+/** The side-view camel artwork, shared by board pieces and leg-bet cards. */
+function CamelSilhouette({ color, edge }: CamelSilhouetteProps) {
+  return (
+    <g fill={color} stroke={edge} strokeWidth="1.6" strokeLinejoin="round">
+      <path
+        d="M -27 1 q -7 2 -9 9"
+        fill="none"
+        stroke={edge}
+        strokeWidth="2.6"
+        strokeLinecap="round"
+      />
+      <rect x={-26} y={5} width={6} height={13} rx={2} />
+      <rect x={-13} y={5} width={6} height={13} rx={2} />
+      <rect x={4} y={5} width={6} height={13} rx={2} />
+      <rect x={16} y={5} width={6} height={13} rx={2} />
+      <ellipse cx={-2} cy={3} rx={25} ry={9} />
+      <path d="M -22 -3 C -18 -18 -4 -18 2 -4 Z" />
+      <path d="M 12 2 C 17 -3 18 -13 24 -15 L 30 -15 L 30 -10 L 26 -9 C 24 -8 23 -3 22 3 Z" />
+      <ellipse cx={29} cy={-13} rx={6} ry={4.5} />
+      <path d="M 26 -16 l 2 -3 2 3 Z" />
+      <circle cx={31} cy={-14} r={1.1} fill="#33261d" stroke="none" />
+    </g>
+  );
+}
+
 /**
  * A side-view camel meeple, drawn around its centre at (x, y). The silhouette
  * stays inside the camel's fixed footprint so five fit in one board field.
@@ -151,25 +195,88 @@ function CamelPiece({ color, x, y, space, stackIndex, finished = false }: CamelP
       transform={`translate(${x} ${y})`}
       filter="url(#camel-shadow)"
     >
-      <g fill={style.color} stroke={style.edge} strokeWidth="1.6" strokeLinejoin="round">
-        <path
-          d="M -27 1 q -7 2 -9 9"
-          fill="none"
-          stroke={style.edge}
-          strokeWidth="2.6"
-          strokeLinecap="round"
-        />
-        <rect x={-26} y={5} width={6} height={13} rx={2} />
-        <rect x={-13} y={5} width={6} height={13} rx={2} />
-        <rect x={4} y={5} width={6} height={13} rx={2} />
-        <rect x={16} y={5} width={6} height={13} rx={2} />
-        <ellipse cx={-2} cy={3} rx={25} ry={9} />
-        <path d="M -22 -3 C -18 -18 -4 -18 2 -4 Z" />
-        <path d="M 12 2 C 17 -3 18 -13 24 -15 L 30 -15 L 30 -10 L 26 -9 C 24 -8 23 -3 22 3 Z" />
-        <ellipse cx={29} cy={-13} rx={6} ry={4.5} />
-        <path d="M 26 -16 l 2 -3 2 3 Z" />
+      <CamelSilhouette color={style.color} edge={style.edge} />
+    </g>
+  );
+}
+
+type LegBetCardProps = {
+  readonly color: CamelColor;
+  readonly value: LegBetValue;
+  readonly x: number;
+  readonly y: number;
+  /** Only the fully visible top tile can be taken. */
+  readonly topCard: boolean;
+  readonly enabled: boolean;
+  readonly onTake: (color: CamelColor) => void;
+};
+
+/** One square tile in a camel's 5/3/2 leg-bet stack. */
+function LegBetCard({ color, value, x, y, topCard, enabled, onTake }: LegBetCardProps) {
+  const style = CAMEL_DIE_STYLES[color];
+  const label = `Take ${style.label} ${value} leg-bet tile`;
+  const handleClick = () => {
+    if (topCard && enabled) {
+      onTake(color);
+    }
+  };
+
+  return (
+    <g
+      data-leg-bet-card={color}
+      data-leg-bet-value={value}
+      data-leg-bet-available={topCard && enabled ? "true" : undefined}
+      className={
+        topCard
+          ? `leg-bet-card${enabled ? " leg-bet-card--available" : ""}`
+          : "leg-bet-card leg-bet-card--covered"
+      }
+      role={topCard ? "button" : undefined}
+      tabIndex={topCard ? (enabled ? 0 : -1) : undefined}
+      aria-label={topCard ? label : undefined}
+      aria-disabled={topCard && !enabled ? "true" : undefined}
+      aria-hidden={topCard ? undefined : true}
+      transform={`translate(${x} ${y})`}
+      filter="url(#card-shadow)"
+      onClick={handleClick}
+      onKeyDown={(event) => {
+        if (topCard && enabled && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          handleClick();
+        }
+      }}
+    >
+      <rect
+        width={LEG_BET_CARD_SIZE}
+        height={LEG_BET_CARD_SIZE}
+        rx="10"
+        fill={style.color}
+        stroke={style.edge}
+        strokeWidth="3"
+      />
+      <rect
+        x="7"
+        y="7"
+        width={LEG_BET_CARD_SIZE - 14}
+        height={LEG_BET_CARD_SIZE - 14}
+        rx="7"
+        fill="none"
+        stroke="#ffffff"
+        strokeOpacity="0.4"
+        strokeWidth="2"
+      />
+      <g transform={`translate(${LEG_BET_CARD_SIZE / 2} 44) scale(0.62)`}>
+        <CamelSilhouette color={style.color} edge={style.edge} />
       </g>
-      <circle cx={31} cy={-14} r={1.1} fill="#33261d" />
+      <text
+        x={LEG_BET_CARD_SIZE / 2}
+        y={LEG_BET_CARD_SIZE - 14}
+        textAnchor="middle"
+        className="leg-bet-value"
+        fill={style.edge}
+      >
+        {value}
+      </text>
     </g>
   );
 }
@@ -213,6 +320,7 @@ type FocusTarget = "add" | "clear" | "next";
 export default function App() {
   const [dice, setDice] = useState<readonly ThrownDie[]>([]);
   const [race, setRace] = useState<RaceState>(createRaceState);
+  const [legBets, setLegBets] = useState<LegBetState>(createLegBetState);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedColor, setSelectedColor] = useState<CamelColor | "">("");
   const [selectedValue, setSelectedValue] = useState<DieValue | "">("");
@@ -229,7 +337,8 @@ export default function App() {
   const hasDice = dice.length > 0;
   const canAddDie = remainingColors.length > 0 && !raceFinished;
   const canStartNextRound = dice.length === MAX_DICE && !raceFinished;
-  const canClear = hasDice || camelsOnBoard;
+  const canTakeLegBet = dice.length < MAX_DICE && !raceFinished;
+  const canClear = hasDice || camelsOnBoard || hasTakenLegBet(legBets);
 
   const defaultFocusTarget = (): FocusTarget =>
     canAddDie ? "add" : canStartNextRound ? "next" : "clear";
@@ -369,9 +478,18 @@ export default function App() {
     closeDialog(focusTarget);
   };
 
+  const handleTakeLegBet = (color: CamelColor) => {
+    if (!canTakeLegBet) {
+      return;
+    }
+
+    setLegBets((current) => takeLegBet(current, color));
+  };
+
   const clearBoard = () => {
     setDice([]);
     setRace(createRaceState());
+    setLegBets(createLegBetState());
     setFocusAfterClose("add");
   };
 
@@ -381,6 +499,7 @@ export default function App() {
     }
 
     setDice([]);
+    setLegBets(createLegBetState());
     setFocusAfterClose("add");
   };
 
@@ -424,6 +543,48 @@ export default function App() {
 
   const finishedCenters = race.finished ? getFinishOverflowCenters(race.finished.length) : [];
 
+  const legBetStacks = CAMEL_COLORS.map((color, colorIndex) => {
+    const remaining = legBets[color];
+    const values = LEG_BET_VALUES.slice(LEG_BET_VALUES.length - remaining);
+    const centerX = LEG_BET_CENTERS[colorIndex];
+    const placements = getLegBetCardPlacements(centerX, values.length);
+
+    if (placements.length === 0) {
+      const empty = getLegBetCardPlacements(centerX, 1)[0];
+
+      return (
+        <rect
+          key={`empty-${color}`}
+          data-leg-bet-empty={color}
+          className="leg-bet-empty"
+          x={empty.x}
+          y={empty.y}
+          width={LEG_BET_CARD_SIZE}
+          height={LEG_BET_CARD_SIZE}
+          rx="10"
+          aria-hidden="true"
+        />
+      );
+    }
+
+    // Paint covered tiles first so the fully visible top tile is on top.
+    return values
+      .map((value, index) => ({ value, placement: placements[index], topCard: index === 0 }))
+      .reverse()
+      .map(({ value, placement, topCard }) => (
+        <LegBetCard
+          key={`${color}-${value}`}
+          color={color}
+          value={value}
+          x={placement.x}
+          y={placement.y}
+          topCard={topCard}
+          enabled={canTakeLegBet}
+          onTake={handleTakeLegBet}
+        />
+      ));
+  });
+
   return (
     <main className="page">
       <div className="page-content" inert={isDialogOpen} data-page-content="true">
@@ -447,6 +608,8 @@ export default function App() {
                 fields, stacked tightly when they share one. A camel that passes the finish line is
                 drawn just above it, outside the track. The light central three by three panel
                 contains a centred three by one tray for five coloured dice and an add-die button.
+                Above the track are five stacks of square leg-betting tiles for the five camels,
+                printed 5, 3, and 2; only the top tile of each stack can be taken.
               </desc>
 
               <defs>
@@ -468,6 +631,15 @@ export default function App() {
                     floodOpacity="0.25"
                   />
                 </filter>
+                <filter id="card-shadow" x="-30%" y="-30%" width="160%" height="170%">
+                  <feDropShadow
+                    dx="0"
+                    dy="3"
+                    stdDeviation="2.5"
+                    floodColor="#3a2d25"
+                    floodOpacity="0.3"
+                  />
+                </filter>
                 <pattern id="finish-checker" width="10" height="10" patternUnits="userSpaceOnUse">
                   <rect width="10" height="10" fill="#f8efd8" />
                   <rect width="5" height="5" fill="#3a2d25" />
@@ -476,6 +648,29 @@ export default function App() {
               </defs>
 
               <rect width={BOARD_VIEWBOX.width} height={BOARD_VIEWBOX.height} fill="#e3b87a" />
+
+              <g role="group" aria-label="Leg-betting tiles" data-leg-bets="true">
+                <rect
+                  x={LEG_BET_BAND.x}
+                  y={LEG_BET_BAND.y}
+                  width={LEG_BET_BAND.width}
+                  height={LEG_BET_BAND.height}
+                  className="leg-bet-band"
+                  aria-hidden="true"
+                />
+                <rect
+                  x={LEG_BET_BAND.x + 2}
+                  y={LEG_BET_BAND.y + 2}
+                  width={LEG_BET_BAND.width - 4}
+                  height={LEG_BET_BAND.height - 4}
+                  fill="none"
+                  stroke="#5b3520"
+                  strokeWidth="4"
+                  shapeRendering="crispEdges"
+                  aria-hidden="true"
+                />
+                {legBetStacks}
+              </g>
 
               <g role="group" aria-label="Track spaces">
                 {BOARD_SPACES.map((space) => {

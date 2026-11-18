@@ -25,6 +25,11 @@ Single-page TypeScript frontend for the Camel Up decision tracker.
   camels fit in one field, centred without changing size. A camel that passes
   space 16 is drawn above the finish line and locks the round: the plus button
   and Next round are disabled until Clear resets the board.
+- Above the track, five stacks of square leg-bet cards show each camel's 5, 3,
+  and 2 tiles. Only the fully visible top tile is clickable; taking it reveals
+  the next tile, and an exhausted stack leaves an empty, non-clickable outline.
+  Card clicks are disabled once five dice have been thrown or the race has
+  finished. Clear and Next round restore all three tiles for every camel.
 - No backend connection. Camel positions are temporary local UI state for
   driving the SVG; the Rust crate remains the authoritative rules model.
 
@@ -69,6 +74,7 @@ frontend/
     App.tsx           # the one page: SVG board, dice, camels, and add-die dialog
     boardLayout.ts    # static 5 x 5 map and camel/stack geometry for spaces 1..16
     camelRace.ts      # local camel positions and die-driven movement
+    legBets.ts        # local 5/3/2 leg-bet tile stacks
     main.tsx
     styles.css
     test/setup.ts
