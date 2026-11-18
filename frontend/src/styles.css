@@ -46,6 +46,12 @@ body {
 }
 
 .game {
+  /* The leg-bet band occupies 19% of the board width above the square board. */
+  --board-size: min(
+    calc(100vw - 2 * var(--page-gutter)),
+    calc((100svh - 2 * var(--page-gutter) - var(--controls-height) - var(--controls-gap)) / 1.19),
+    1000px
+  );
   display: grid;
   width: fit-content;
   max-width: 100%;
@@ -53,14 +59,21 @@ body {
   gap: var(--controls-gap);
 }
 
+.board-stack {
+  width: var(--board-size);
+  max-width: 100%;
+}
+
+.betting-field {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1000 / 190;
+}
+
 .board-frame {
   position: relative;
   container-type: inline-size;
-  width: min(
-    calc(100vw - 2 * var(--page-gutter)),
-    calc(100svh - 2 * var(--page-gutter) - var(--controls-height) - var(--controls-gap)),
-    1000px
-  );
+  width: 100%;
   max-width: 100%;
   aspect-ratio: 1 / 1;
   background: var(--field);
@@ -100,6 +113,49 @@ body {
   stroke: #c9a26a;
   stroke-width: 2;
   stroke-dasharray: 5 5;
+}
+
+.leg-bet-band {
+  fill: var(--field);
+}
+
+.leg-bet-card {
+  cursor: default;
+}
+
+.leg-bet-card--available {
+  cursor: pointer;
+}
+
+.leg-bet-card[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.leg-bet-card:focus {
+  outline: none;
+}
+
+.leg-bet-card--available:hover > rect:first-of-type,
+.leg-bet-card:focus-visible > rect:first-of-type {
+  stroke: #2f6f68;
+  stroke-width: 6;
+}
+
+.leg-bet-value {
+  font-size: 36px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.7);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.leg-bet-empty {
+  fill: rgba(253, 242, 220, 0.35);
+  stroke: #a97945;
+  stroke-width: 3;
+  stroke-dasharray: 10 7;
 }
 
 .add-die-button {
