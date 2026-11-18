@@ -115,6 +115,82 @@ fn rearmost_camel_is_overall_loser() {
 }
 
 #[test]
+fn desert_tiles_are_removed_when_the_leg_ends() {
+    let with_desert = State::new(map(&[
+        (1, Space::Camels(vec![Camel::White])),
+        (2, Space::Camels(vec![Camel::Yellow])),
+        (3, Space::Camels(vec![Camel::Orange])),
+        (4, Space::Camels(vec![Camel::Green])),
+        (5, Space::Camels(vec![Camel::Blue])),
+        (9, Space::Desert(DesertTile::Oasis)),
+    ]));
+    let without_desert = State::new(map(&[
+        (1, Space::Camels(vec![Camel::White])),
+        (2, Space::Camels(vec![Camel::Yellow])),
+        (3, Space::Camels(vec![Camel::Orange])),
+        (4, Space::Camels(vec![Camel::Green])),
+        (5, Space::Camels(vec![Camel::Blue])),
+    ]));
+
+    // All five dice are already gone, so the simulation starts by returning
+    // the desert tile to its owner. Both states must then behave identically.
+    let with = simulate_overall_winner_loser_with(&with_desert, 2_000, 77, &ALL);
+    let without = simulate_overall_winner_loser_with(&without_desert, 2_000, 77, &ALL);
+    assert_eq!(with, without);
+}
+
+#[test]
+fn oasis_on_space_16_causes_a_finish() {
+    let state = State::new(map(&[
+        (15, Space::Camels(vec![Camel::White])),
+        (1, Space::Camels(vec![Camel::Yellow])),
+        (2, Space::Camels(vec![Camel::Orange])),
+        (3, Space::Camels(vec![Camel::Green])),
+        (4, Space::Camels(vec![Camel::Blue])),
+        (16, Space::Desert(DesertTile::Oasis)),
+    ]));
+
+    let shares = simulate_overall_winner_loser_with(&state, 2_000, 5, &[]);
+    assert_valid_shares(&shares);
+    assert_eq!(shares[index(Camel::White)], 1.0);
+}
+
+#[test]
+fn lower_camel_carries_stack_over_finish_and_top_camel_wins() {
+    let state = State::new(map(&[
+        (15, Space::Camels(vec![Camel::White, Camel::Yellow])),
+        (1, Space::Camels(vec![Camel::Orange])),
+        (2, Space::Camels(vec![Camel::Green])),
+        (3, Space::Camels(vec![Camel::Blue])),
+    ]));
+
+    // Yellow's die was already revealed, so White always moves the whole
+    // stack and Yellow cannot leave it before the finish.
+    let shares = simulate_overall_winner_loser_with(&state, 2_000, 6, &[Camel::Yellow]);
+    assert_valid_shares(&shares);
+    assert_eq!(shares[index(Camel::Yellow)], 1.0);
+}
+
+#[test]
+fn balanced_board_gives_every_camel_a_nonzero_share() {
+    let state = State::new(map(&[
+        (1, Space::Camels(vec![Camel::White])),
+        (3, Space::Camels(vec![Camel::Yellow])),
+        (5, Space::Camels(vec![Camel::Orange])),
+        (7, Space::Camels(vec![Camel::Green])),
+        (9, Space::Camels(vec![Camel::Blue])),
+    ]));
+
+    let shares = simulate_overall_winner_loser(&state);
+    assert_valid_shares(&shares);
+    assert!(
+        shares.iter().all(|&share| share > 0.0),
+        "every camel should get a non-zero share: {:?}",
+        shares
+    );
+}
+
+#[test]
 fn finished_state_needs_no_rolls() {
     let state = State::new(map(&[
         (17, Space::Camels(vec![Camel::White])),
@@ -175,7 +251,7 @@ fn calibrate_iterations() {
     let reference_iterations = 1_000_000usize;
     let reference =
         simulate_overall_winner_loser_with(&base_state(), reference_iterations, 0xC0FFEE, &[]);
-    let seeds = [11u64, 22, 33];
+    let seeds = [DEFAULT_SEED, 11, 22, 33];
 
     println!(
         "reference: {} scenarios, seed 0x{:X}",
