@@ -59,12 +59,22 @@ body {
   gap: var(--controls-gap);
 }
 
+.board-stack {
+  width: var(--board-size);
+  max-width: 100%;
+}
+
+.betting-field {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1000 / 190;
+}
+
 .board-frame {
   position: relative;
   container-type: inline-size;
-  width: var(--board-size);
+  width: 100%;
   max-width: 100%;
-  margin-top: calc(var(--board-size) * 0.19);
   aspect-ratio: 1 / 1;
   background: var(--field);
   box-shadow:

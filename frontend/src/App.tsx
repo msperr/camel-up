@@ -591,46 +591,20 @@ export default function App() {
         <h1 className="sr-only">Camel Up board</h1>
 
         <div className="game">
-          <div className="board-frame">
+          <div className="board-stack">
             <svg
-              className="board"
-              viewBox={`0 0 ${BOARD_VIEWBOX.width} ${BOARD_VIEWBOX.height}`}
-              role="img"
-              aria-labelledby="board-title"
-              aria-describedby="board-desc"
+              className="betting-field"
+              viewBox={`${LEG_BET_BAND.x} ${LEG_BET_BAND.y} ${LEG_BET_BAND.width} ${LEG_BET_BAND.height}`}
+              role="group"
+              aria-labelledby="betting-title"
+              aria-describedby="betting-desc"
             >
-              <title id="board-title">Camel Up board</title>
-              <desc id="board-desc">
-                Square Camel Up board with five rows and five columns. Sixteen dark track spaces run
-                clockwise around the edge; space 1 is at the top middle, space 16 directly to its
-                left, and the checkered finish line sits between them. Small numbers appear on the
-                inner edges of the twelve non-corner spaces. Coloured camel pieces stand on the
-                fields, stacked tightly when they share one. A camel that passes the finish line is
-                drawn just above it, outside the track. The light central three by three panel
-                contains a centred three by one tray for five coloured dice and an add-die button.
-                Above the track are five stacks of square leg-betting tiles for the five camels,
-                printed 5, 3, and 2; only the top tile of each stack can be taken.
+              <title id="betting-title">Leg-betting tiles</title>
+              <desc id="betting-desc">
+                Five stacks of square tiles, one per camel, printed 5, 3, and 2. Only the fully
+                visible top tile of each stack can be taken.
               </desc>
-
               <defs>
-                <filter id="die-shadow" x="-50%" y="-50%" width="200%" height="220%">
-                  <feDropShadow
-                    dx="0"
-                    dy="4"
-                    stdDeviation="3"
-                    floodColor="#3a2d25"
-                    floodOpacity="0.28"
-                  />
-                </filter>
-                <filter id="camel-shadow" x="-30%" y="-30%" width="160%" height="180%">
-                  <feDropShadow
-                    dx="0"
-                    dy="2"
-                    stdDeviation="1.5"
-                    floodColor="#3a2d25"
-                    floodOpacity="0.25"
-                  />
-                </filter>
                 <filter id="card-shadow" x="-30%" y="-30%" width="160%" height="170%">
                   <feDropShadow
                     dx="0"
@@ -640,16 +614,8 @@ export default function App() {
                     floodOpacity="0.3"
                   />
                 </filter>
-                <pattern id="finish-checker" width="10" height="10" patternUnits="userSpaceOnUse">
-                  <rect width="10" height="10" fill="#f8efd8" />
-                  <rect width="5" height="5" fill="#3a2d25" />
-                  <rect x="5" y="5" width="5" height="5" fill="#3a2d25" />
-                </pattern>
               </defs>
-
-              <rect width={BOARD_VIEWBOX.width} height={BOARD_VIEWBOX.height} fill="#e3b87a" />
-
-              <g role="group" aria-label="Leg-betting tiles" data-leg-bets="true">
+              <g data-leg-bets="true">
                 <rect
                   x={LEG_BET_BAND.x}
                   y={LEG_BET_BAND.y}
@@ -671,155 +637,205 @@ export default function App() {
                 />
                 {legBetStacks}
               </g>
-
-              <g role="group" aria-label="Track spaces">
-                {BOARD_SPACES.map((space) => {
-                  const number = getSpaceNumberPlacement(space);
-
-                  return (
-                    <g
-                      key={space.space}
-                      role="group"
-                      aria-label={`Space ${space.space}`}
-                      data-space={space.space}
-                      data-column={space.column}
-                      data-row={space.row}
-                    >
-                      <rect
-                        x={space.x - space.width / 2}
-                        y={space.y - space.height / 2}
-                        width={space.width}
-                        height={space.height}
-                        className="space-tile"
-                        shapeRendering="crispEdges"
-                      />
-                      {number && (
-                        <text
-                          x={0}
-                          y={0}
-                          transform={`translate(${number.x} ${number.y}) rotate(${number.rotation})`}
-                          textAnchor="middle"
-                          dominantBaseline="central"
-                          className="space-number"
-                          data-number={space.space}
-                          data-rotation={number.rotation}
-                        >
-                          {space.space}
-                        </text>
-                      )}
-                    </g>
-                  );
-                })}
-              </g>
-
-              <g aria-hidden="true" data-center-panel="true">
-                <rect
-                  x={CENTER_PANEL.x}
-                  y={CENTER_PANEL.y}
-                  width={CENTER_PANEL.width}
-                  height={CENTER_PANEL.height}
-                  className="center-panel"
-                  shapeRendering="crispEdges"
-                />
-
-                <rect
-                  x={DICE_TRAY.x}
-                  y={DICE_TRAY.y}
-                  width={DICE_TRAY.width}
-                  height={DICE_TRAY.height}
-                  className="dice-tray"
-                  data-dice-tray="true"
-                  shapeRendering="crispEdges"
-                />
-
-                {Array.from({ length: MAX_DICE }, (_, index) => {
-                  const die = dice[index];
-                  const centerX = SLOT_CENTERS[index];
-
-                  return (
-                    <g key={index} data-die-slot={index + 1}>
-                      {!die && (
-                        <rect
-                          x={centerX - DICE_SIZE / 2}
-                          y={DICE_ROW_Y - DICE_SIZE / 2}
-                          width={DICE_SIZE}
-                          height={DICE_SIZE}
-                          rx="14"
-                          className="die-slot"
-                          shapeRendering="crispEdges"
-                        />
-                      )}
-                      {die && (
-                        <DieFace
-                          color={die.color}
-                          value={die.value}
-                          x={centerX}
-                          y={DICE_ROW_Y}
-                          rotation={SLOT_ROTATIONS[index]}
-                        />
-                      )}
-                    </g>
-                  );
-                })}
-              </g>
-
-              <g aria-hidden="true" data-finish-line="true">
-                <rect
-                  x={FINISH_LINE.x - FINISH_LINE.width / 2}
-                  y={FINISH_LINE.y}
-                  width={FINISH_LINE.width}
-                  height={FINISH_LINE.height}
-                  fill="url(#finish-checker)"
-                  shapeRendering="crispEdges"
-                />
-              </g>
-
-              {camelPieces.length > 0 && (
-                <g aria-hidden="true" data-camels="true">
-                  {camelPieces}
-                </g>
-              )}
-
-              {race.finished && (
-                <g aria-hidden="true" data-finished-camels="true">
-                  {race.finished.map((color, index) => (
-                    <CamelPiece
-                      key={`finished-${index}-${color}`}
-                      color={color}
-                      x={finishedCenters[index].x}
-                      y={finishedCenters[index].y}
-                      stackIndex={index}
-                      finished
-                    />
-                  ))}
-                </g>
-              )}
-
-              <rect
-                x="2"
-                y="2"
-                width={BOARD_VIEWBOX.width - 4}
-                height={BOARD_VIEWBOX.height - 4}
-                fill="none"
-                stroke="#5b3520"
-                strokeWidth="4"
-                shapeRendering="crispEdges"
-              />
             </svg>
 
-            <button
-              ref={addButtonRef}
-              type="button"
-              className="add-die-button"
-              aria-label="Add die"
-              title="Add die"
-              data-add-die="true"
-              style={addButtonStyle}
-              onClick={openDialog}
-              disabled={!canAddDie}
-            >
-              <span aria-hidden="true">+</span>
-            </button>
+            <div className="board-frame">
+              <svg
+                className="board"
+                viewBox={`0 0 ${BOARD_VIEWBOX.width} ${BOARD_VIEWBOX.height}`}
+                role="img"
+                aria-labelledby="board-title"
+                aria-describedby="board-desc"
+              >
+                <title id="board-title">Camel Up board</title>
+                <desc id="board-desc">
+                  Square Camel Up board with five rows and five columns. Sixteen dark track spaces
+                  run clockwise around the edge; space 1 is at the top middle, space 16 directly to
+                  its left, and the checkered finish line sits between them. Small numbers appear on
+                  the inner edges of the twelve non-corner spaces. Coloured camel pieces stand on
+                  the fields, stacked tightly when they share one. A camel that passes the finish
+                  line is drawn just above it, outside the track. The light central three by three
+                  panel contains a centred three by one tray for five coloured dice and an add-die
+                  button.
+                </desc>
+
+                <defs>
+                  <filter id="die-shadow" x="-50%" y="-50%" width="200%" height="220%">
+                    <feDropShadow
+                      dx="0"
+                      dy="4"
+                      stdDeviation="3"
+                      floodColor="#3a2d25"
+                      floodOpacity="0.28"
+                    />
+                  </filter>
+                  <filter id="camel-shadow" x="-30%" y="-30%" width="160%" height="180%">
+                    <feDropShadow
+                      dx="0"
+                      dy="2"
+                      stdDeviation="1.5"
+                      floodColor="#3a2d25"
+                      floodOpacity="0.25"
+                    />
+                  </filter>
+                  <pattern id="finish-checker" width="10" height="10" patternUnits="userSpaceOnUse">
+                    <rect width="10" height="10" fill="#f8efd8" />
+                    <rect width="5" height="5" fill="#3a2d25" />
+                    <rect x="5" y="5" width="5" height="5" fill="#3a2d25" />
+                  </pattern>
+                </defs>
+
+                <rect width={BOARD_VIEWBOX.width} height={BOARD_VIEWBOX.height} fill="#e3b87a" />
+
+                <g role="group" aria-label="Track spaces">
+                  {BOARD_SPACES.map((space) => {
+                    const number = getSpaceNumberPlacement(space);
+
+                    return (
+                      <g
+                        key={space.space}
+                        role="group"
+                        aria-label={`Space ${space.space}`}
+                        data-space={space.space}
+                        data-column={space.column}
+                        data-row={space.row}
+                      >
+                        <rect
+                          x={space.x - space.width / 2}
+                          y={space.y - space.height / 2}
+                          width={space.width}
+                          height={space.height}
+                          className="space-tile"
+                          shapeRendering="crispEdges"
+                        />
+                        {number && (
+                          <text
+                            x={0}
+                            y={0}
+                            transform={`translate(${number.x} ${number.y}) rotate(${number.rotation})`}
+                            textAnchor="middle"
+                            dominantBaseline="central"
+                            className="space-number"
+                            data-number={space.space}
+                            data-rotation={number.rotation}
+                          >
+                            {space.space}
+                          </text>
+                        )}
+                      </g>
+                    );
+                  })}
+                </g>
+
+                <g aria-hidden="true" data-center-panel="true">
+                  <rect
+                    x={CENTER_PANEL.x}
+                    y={CENTER_PANEL.y}
+                    width={CENTER_PANEL.width}
+                    height={CENTER_PANEL.height}
+                    className="center-panel"
+                    shapeRendering="crispEdges"
+                  />
+
+                  <rect
+                    x={DICE_TRAY.x}
+                    y={DICE_TRAY.y}
+                    width={DICE_TRAY.width}
+                    height={DICE_TRAY.height}
+                    className="dice-tray"
+                    data-dice-tray="true"
+                    shapeRendering="crispEdges"
+                  />
+
+                  {Array.from({ length: MAX_DICE }, (_, index) => {
+                    const die = dice[index];
+                    const centerX = SLOT_CENTERS[index];
+
+                    return (
+                      <g key={index} data-die-slot={index + 1}>
+                        {!die && (
+                          <rect
+                            x={centerX - DICE_SIZE / 2}
+                            y={DICE_ROW_Y - DICE_SIZE / 2}
+                            width={DICE_SIZE}
+                            height={DICE_SIZE}
+                            rx="14"
+                            className="die-slot"
+                            shapeRendering="crispEdges"
+                          />
+                        )}
+                        {die && (
+                          <DieFace
+                            color={die.color}
+                            value={die.value}
+                            x={centerX}
+                            y={DICE_ROW_Y}
+                            rotation={SLOT_ROTATIONS[index]}
+                          />
+                        )}
+                      </g>
+                    );
+                  })}
+                </g>
+
+                <g aria-hidden="true" data-finish-line="true">
+                  <rect
+                    x={FINISH_LINE.x - FINISH_LINE.width / 2}
+                    y={FINISH_LINE.y}
+                    width={FINISH_LINE.width}
+                    height={FINISH_LINE.height}
+                    fill="url(#finish-checker)"
+                    shapeRendering="crispEdges"
+                  />
+                </g>
+
+                {camelPieces.length > 0 && (
+                  <g aria-hidden="true" data-camels="true">
+                    {camelPieces}
+                  </g>
+                )}
+
+                {race.finished && (
+                  <g aria-hidden="true" data-finished-camels="true">
+                    {race.finished.map((color, index) => (
+                      <CamelPiece
+                        key={`finished-${index}-${color}`}
+                        color={color}
+                        x={finishedCenters[index].x}
+                        y={finishedCenters[index].y}
+                        stackIndex={index}
+                        finished
+                      />
+                    ))}
+                  </g>
+                )}
+
+                <rect
+                  x="2"
+                  y="2"
+                  width={BOARD_VIEWBOX.width - 4}
+                  height={BOARD_VIEWBOX.height - 4}
+                  fill="none"
+                  stroke="#5b3520"
+                  strokeWidth="4"
+                  shapeRendering="crispEdges"
+                />
+              </svg>
+
+              <button
+                ref={addButtonRef}
+                type="button"
+                className="add-die-button"
+                aria-label="Add die"
+                title="Add die"
+                data-add-die="true"
+                style={addButtonStyle}
+                onClick={openDialog}
+                disabled={!canAddDie}
+              >
+                <span aria-hidden="true">+</span>
+              </button>
+            </div>
           </div>
 
           <div className="dice-controls" data-dice-controls="true">
