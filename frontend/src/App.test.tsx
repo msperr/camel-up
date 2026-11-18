@@ -50,6 +50,19 @@ const addDie = (color: string, value: string) => {
 
 const DIE_COLORS = ["white", "yellow", "orange", "green", "blue"] as const;
 
+const getBetCards = (container: HTMLElement) => [
+  ...container.querySelectorAll<SVGGElement>("[data-leg-bet-card]"),
+];
+
+const getAvailableBetCards = (container: HTMLElement) =>
+  getBetCards(container).filter((card) => card.dataset.legBetAvailable === "true");
+
+const getBetCardsFor = (container: HTMLElement, color: string) =>
+  getBetCards(container).filter((card) => card.dataset.legBetCard === color);
+
+const takeTopBet = (label: string) =>
+  fireEvent.click(screen.getByRole("button", { name: `Take ${label} leg-bet tile` }));
+
 const fillRound = (values: readonly string[]) => {
   DIE_COLORS.forEach((color, index) => addDie(color, values[index]));
 };
@@ -622,4 +635,147 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Next round" })).toBeDisabled();
     await waitFor(() => expect(screen.getByRole("button", { name: "Clear" })).toHaveFocus());
   }, 20000);
+
+  describe("leg-bet cards", () => {
+    it("starts with three cards per camel and only the fives available", () => {
+      const { container } = render(<App />);
+
+      expect(container.querySelector('[data-leg-bets="true"]')).toBeInTheDocument();
+      expect(getBetCards(container)).toHaveLength(15);
+      expect(getAvailableBetCards(container).map((card) => card.dataset.legBetCard)).toEqual([
+        ...DIE_COLORS,
+      ]);
+      expect(getAvailableBetCards(container).map((card) => card.dataset.legBetValue)).toEqual([
+        "5",
+        "5",
+        "5",
+        "5",
+        "5",
+      ]);
+      expect(container.querySelectorAll("[data-leg-bet-empty]")).toHaveLength(0);
+      expect(screen.getByRole("button", { name: "Take White 5 leg-bet tile" })).toBeEnabled();
+      expect(getCamels(container)).toHaveLength(0);
+    });
+
+    it("only takes the fully visible top card and reveals the next value", () => {
+      const { container } = render(<App />);
+      const coveredThree = container.querySelector(
+        '[data-leg-bet-card="white"][data-leg-bet-value="3"]',
+      );
+
+      fireEvent.click(coveredThree as Element);
+
+      expect(getBetCardsFor(container, "white")).toHaveLength(3);
+      takeTopBet("White 5");
+
+      expect(
+        getBetCardsFor(container, "white")
+          .map((card) => card.dataset.legBetValue)
+          .sort(),
+      ).toEqual(["2", "3"]);
+      expect(screen.queryByRole("button", { name: "Take White 5 leg-bet tile" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Take White 3 leg-bet tile" })).toBeInTheDocument();
+      expect(
+        getBetCardsFor(container, "yellow")
+          .map((card) => card.dataset.legBetValue)
+          .sort(),
+      ).toEqual(["2", "3", "5"]);
+      expect(getAvailableBetCards(container)).toHaveLength(5);
+    });
+
+    it("leaves an empty, non-clickable slot after taking the last card", () => {
+      const { container } = render(<App />);
+
+      takeTopBet("White 5");
+      takeTopBet("White 3");
+      takeTopBet("White 2");
+
+      expect(getBetCardsFor(container, "white")).toHaveLength(0);
+      expect(container.querySelector('[data-leg-bet-empty="white"]')).toBeInTheDocument();
+      expect(container.querySelectorAll("[data-leg-bet-empty]")).toHaveLength(1);
+      expect(getBetCards(container)).toHaveLength(12);
+      expect(getAvailableBetCards(container)).toHaveLength(4);
+      expect(screen.queryByRole("button", { name: /Take White/ })).toBeNull();
+    });
+
+    it("takes a card with Enter and Space", () => {
+      render(<App />);
+
+      const five = screen.getByRole("button", { name: "Take Blue 5 leg-bet tile" });
+      five.focus();
+      fireEvent.keyDown(five, { key: "Enter" });
+
+      expect(screen.getByRole("button", { name: "Take Blue 3 leg-bet tile" })).toBeInTheDocument();
+
+      const three = screen.getByRole("button", { name: "Take Blue 3 leg-bet tile" });
+      fireEvent.keyDown(three, { key: " " });
+
+      expect(screen.getByRole("button", { name: "Take Blue 2 leg-bet tile" })).toBeInTheDocument();
+    });
+
+    it("disables every top card once five dice are thrown", () => {
+      const { container } = render(<App />);
+
+      fillRound(["1", "1", "1", "1", "1"]);
+
+      for (const label of ["White", "Yellow", "Orange", "Green", "Blue"]) {
+        const card = screen.getByRole("button", { name: `Take ${label} 5 leg-bet tile` });
+        expect(card).toHaveAttribute("aria-disabled", "true");
+        fireEvent.click(card);
+      }
+
+      expect(getBetCards(container)).toHaveLength(15);
+      expect(getAvailableBetCards(container)).toHaveLength(0);
+    });
+
+    it("disables the cards when a camel finishes the race early", () => {
+      const { container } = render(<App />);
+
+      for (let round = 0; round < 5; round += 1) {
+        fillRound(["3", "1", "1", "1", "1"]);
+        fireEvent.click(screen.getByRole("button", { name: "Next round" }));
+      }
+      addDie("white", "2");
+
+      const card = screen.getByRole("button", { name: "Take Yellow 5 leg-bet tile" });
+      expect(card).toHaveAttribute("aria-disabled", "true");
+      fireEvent.click(card);
+
+      expect(getBetCards(container)).toHaveLength(15);
+    }, 20000);
+
+    it("resets all stacks when Clear is pressed, even if only a card was taken", () => {
+      const { container } = render(<App />);
+      const clear = screen.getByRole("button", { name: "Clear" });
+
+      expect(clear).toBeDisabled();
+      takeTopBet("White 5");
+      expect(clear).toBeEnabled();
+
+      fireEvent.click(clear);
+
+      expect(getBetCards(container)).toHaveLength(15);
+      expect(getAvailableBetCards(container)).toHaveLength(5);
+      expect(screen.getByRole("button", { name: "Take White 5 leg-bet tile" })).toBeInTheDocument();
+      expect(clear).toBeDisabled();
+    });
+
+    it("resets all stacks when Next round is pressed", () => {
+      const { container } = render(<App />);
+
+      takeTopBet("Orange 5");
+      fillRound(["1", "1", "1", "1", "1"]);
+      expect(
+        screen.getByRole("button", { name: "Take Orange 3 leg-bet tile" }),
+      ).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Next round" }));
+
+      expect(getBetCards(container)).toHaveLength(15);
+      expect(getAvailableBetCards(container)).toHaveLength(5);
+      expect(
+        screen.getByRole("button", { name: "Take Orange 5 leg-bet tile" }),
+      ).toBeInTheDocument();
+    });
+  });
 });
