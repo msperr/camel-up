@@ -637,6 +637,16 @@ describe("App", () => {
   }, 20000);
 
   describe("leg-bet cards", () => {
+    it("exposes the cards outside the board's role=img SVG", () => {
+      const { container } = render(<App />);
+      const board = screen.getByRole("img", { name: "Camel Up board" });
+      const whiteFive = screen.getByRole("button", { name: "Take White 5 leg-bet tile" });
+
+      expect(board.contains(whiteFive)).toBe(false);
+      expect(container.querySelector(".betting-field")).toContainElement(whiteFive);
+      expect(screen.getByRole("group", { name: "Leg-betting tiles" })).toBeInTheDocument();
+    });
+
     it("starts with three cards per camel and only the fives available", () => {
       const { container } = render(<App />);
 
