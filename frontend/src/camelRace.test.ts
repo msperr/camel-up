@@ -45,6 +45,18 @@ describe("camel race state", () => {
     });
   });
 
+  it("does not finish when a camel lands exactly on space 16", () => {
+    const state = {
+      stacks: { 15: ["white"] },
+      finished: null,
+    } as const;
+    const next = applyDie(state, "white", 1);
+
+    expect(next.stacks).toEqual({ 16: ["white"] });
+    expect(next.finished).toBeNull();
+    expect(isRaceFinished(next)).toBe(false);
+  });
+
   it("sends a camel unit past the finish line into the overflow area", () => {
     const state = {
       stacks: { 16: ["white", "yellow"] },

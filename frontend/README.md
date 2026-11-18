@@ -25,14 +25,15 @@ Single-page TypeScript frontend for the Camel Up decision tracker.
   camels fit in one field, centred without changing size. A camel that passes
   space 16 is drawn above the finish line and locks the round: the plus button
   and Next round are disabled until Clear resets the board.
-- No backend connection. Camel positions are local UI state for driving the
-  SVG; the Rust crate remains the source of truth for rules evaluation.
+- No backend connection. Camel positions are temporary local UI state for
+  driving the SVG; the Rust crate remains the authoritative rules model.
 
 The implementation follows the frontend architecture decisions in
 `ROADMAP.md` (D-01 to D-07; currently on the
-`docs/frontend-architecture-decisions` branch): TypeScript SPA, React + Vite,
-SVG board, static space-to-coordinate map in the frontend, and the frontend
-depending on an API contract rather than implementing Camel Up rules.
+`docs/frontend-architecture-decisions` branch) for the TypeScript SPA, React +
+Vite setup, SVG board, and static space-to-coordinate map. The local movement
+in `camelRace.ts` is presentation scaffolding until the backend API (D-03 to
+D-07) exists; ranking and legal actions must still come from the backend.
 
 ## Stack
 

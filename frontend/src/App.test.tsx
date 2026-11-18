@@ -569,7 +569,7 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Add die" })).toBeEnabled();
   });
 
-  it("draws a camel that crosses the goal above the finish and locks the round", () => {
+  it("draws a camel that crosses the goal above the finish and locks the round", async () => {
     const { container } = render(<App />);
 
     for (let round = 0; round < 5; round += 1) {
@@ -592,11 +592,34 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Add die" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Next round" })).toBeDisabled();
     expect(screen.getByRole("status")).toHaveTextContent("Race finished");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Clear" })).toHaveFocus());
 
     fireEvent.click(screen.getByRole("button", { name: "Clear" }));
 
     expect(getCamels(container)).toHaveLength(0);
     expect(getDice(container)).toHaveLength(0);
     expect(screen.getByRole("button", { name: "Add die" })).toBeEnabled();
+  }, 20000);
+
+  it("focuses Clear when the fifth die of a round finishes the race", async () => {
+    const { container } = render(<App />);
+
+    for (let round = 0; round < 5; round += 1) {
+      fillRound(["3", "1", "1", "1", "1"]);
+      fireEvent.click(screen.getByRole("button", { name: "Next round" }));
+    }
+
+    addDie("yellow", "1");
+    addDie("orange", "1");
+    addDie("green", "1");
+    addDie("blue", "1");
+    addDie("white", "2");
+
+    expect(getCamelInfo(container).filter(({ finished: isFinished }) => isFinished)).toHaveLength(
+      1,
+    );
+    expect(screen.getByRole("button", { name: "Add die" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next round" })).toBeDisabled();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Clear" })).toHaveFocus());
   }, 20000);
 });

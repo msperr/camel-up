@@ -357,10 +357,16 @@ export default function App() {
     }
 
     const willFillTray = dice.length + 1 >= MAX_DICE;
+    const nextRace = applyDie(race, selectedColor, selectedValue);
+    const focusTarget: FocusTarget = isRaceFinished(nextRace)
+      ? "clear"
+      : willFillTray
+        ? "next"
+        : "add";
 
     setDice((currentDice) => [...currentDice, { color: selectedColor, value: selectedValue }]);
-    setRace((currentRace) => applyDie(currentRace, selectedColor, selectedValue));
-    closeDialog(willFillTray ? "next" : "add");
+    setRace(nextRace);
+    closeDialog(focusTarget);
   };
 
   const clearBoard = () => {
