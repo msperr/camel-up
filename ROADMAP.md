@@ -30,8 +30,9 @@ by design: a desert behind the rearmost camel can never be reached (camel
 positions never decrease across a move), so excluding those spaces loses no
 coin-relevant outcomes.
 
-API note: `State` now has an internal `finished` field. Construct states with
-`State::new(data)`; a `State { data }` struct literal no longer compiles.
+API note: `MAX_FIELD` is now public and re-exported. Keys above 16 in
+`State::data` hold camel units that have crossed the finish line; desert tiles
+remain confined to track spaces `1..=16`.
 
 Priority: **P0** blocks the repository purpose (evaluating actions by expected
 coins); **P1** is required for a usable evaluator; **P2** is completeness or
@@ -59,9 +60,10 @@ Bugs
   tests for exact finish and overshoot.
 - **Status:** Resolved on `fix/rust-core-bugs`. `MAX_FIELD` is now a single
   public constant used for movement and evaluation; the Monte Carlo module
-  delegates to `State::is_finished()`. `move_unit` clamps a crossing unit onto
-  space 16, sets the internal `finished` flag (queryable via
-  `State::is_finished()`), and `move_multiple_units` stops at the finish.
+  delegates to `State::is_finished()`. A crossing unit is placed off the track
+  at a key greater than 16 (17 for an oasis on space 16, otherwise the dice
+  destination), so the finish state is encoded in `data` and survives
+  reconstruction. `move_multiple_units` stops at the finish.
 
 ### B-02 — Ranking index is reversed in simulation — P0
 
@@ -97,13 +99,15 @@ Bugs
 - **Impact:** The API does not actually evaluate "each position"; in the 2014
   game a tile behind all camels is likely to be inert, so the immediate coin
   impact is low, but the candidate set is still incomplete.
-- **Next step:** Iterate the full legal track range (for example 2..=16)
+- ~~**Next step:** Iterate the full legal track range (for example 2..=16)
   independently of `min_key`; add a test with a state whose rearmost camel is
-  ahead of unused spaces.
+  ahead of unused spaces.~~ Superseded by the status below.
 - **Status:** Retained by design. A camel's position never decreases across a
   move (dice and oasis move forward; a mirage moves back one from a space the
   unit just reached by moving forward), so a desert strictly behind the
-  rearmost camel cannot be triggered. No coin-relevant outcomes are lost.
+  rearmost camel cannot be triggered. No coin-relevant outcomes are lost; the
+  candidate range starts at the lowest camel key, so an inert desert behind the
+  camels does not widen it.
 
 ### B-04 — Space 1 is not explicitly excluded — P3
 
@@ -245,4 +249,5 @@ code before verification; only its stale roadmap entry was corrected.
    decisions.
 5. **Finish F-06, F-08** — completeness and robustness (B-03 is intentionally
    excluded; B-04 is resolved).
-6. **Clean up B-05** — cosmetic.
+6. ~~**Clean up B-05** — cosmetic.~~ Already fixed in code before verification;
+   only the stale roadmap entry was corrected.

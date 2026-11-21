@@ -323,8 +323,11 @@ fn overshooting_16_finishes_the_race_with_crossing_unit_first() {
     let (res, desert_hit) = state.move_unit(Camel::White, 3);
 
     assert_eq!(desert_hit, None);
-    // Movement stops at the finish line, with White on top of the stack.
-    assert_eq!(res.data, mk_map(&[(16, vec![Camel::Blue, Camel::White])]));
+    // White leaves the track at 18; Blue stays on space 16.
+    assert_eq!(
+        res.data,
+        mk_map(&[(16, vec![Camel::Blue]), (18, vec![Camel::White])])
+    );
     assert!(res.is_finished());
     assert_eq!(res.ranking(), vec![Camel::White, Camel::Blue]);
 }
@@ -335,7 +338,7 @@ fn moving_from_16_finishes_the_race_and_keeps_stack_order() {
 
     let (res, _) = state.move_unit(Camel::White, 1);
 
-    assert_eq!(res.data, mk_map(&[(16, vec![Camel::White, Camel::Yellow])]));
+    assert_eq!(res.data, mk_map(&[(17, vec![Camel::White, Camel::Yellow])]));
     assert!(res.is_finished());
     assert_eq!(res.ranking(), vec![Camel::Yellow, Camel::White]);
 
@@ -343,26 +346,27 @@ fn moving_from_16_finishes_the_race_and_keeps_stack_order() {
     let (res2, _) = state.move_unit(Camel::Yellow, 2);
     assert_eq!(
         res2.data,
-        mk_map(&[(16, vec![Camel::White, Camel::Yellow])])
+        mk_map(&[(16, vec![Camel::White]), (18, vec![Camel::Yellow])])
     );
     assert!(res2.is_finished());
 }
 
 #[test]
 fn oasis_on_16_finishes_the_race_and_reports_the_hit() {
+    use camel_up::{DesertTile, Space};
+
     let mut map = mk_map(&[(14, vec![Camel::White]), (10, vec![Camel::Blue])]);
-    map.insert(16, camel_up::Space::Desert(camel_up::DesertTile::Oasis));
+    map.insert(16, Space::Desert(DesertTile::Oasis));
     let state = State::new(map);
 
     let (res, desert_hit) = state.move_unit(Camel::White, 2);
 
     assert_eq!(desert_hit, Some(16));
-    assert_eq!(
-        res.data,
-        mk_map(&[(10, vec![Camel::Blue]), (16, vec![Camel::White])])
-    );
+    let mut expected = mk_map(&[(10, vec![Camel::Blue]), (17, vec![Camel::White])]);
+    expected.insert(16, Space::Desert(DesertTile::Oasis));
+    assert_eq!(res.data, expected);
     assert!(res.is_finished());
-    assert_eq!(res.ranking()[0], Camel::White);
+    assert_eq!(res.ranking().first(), Some(&Camel::White));
 }
 
 #[test]
@@ -386,7 +390,10 @@ fn move_multiple_units_stops_after_the_finish_line() {
 
     let (res, desert_hits) = state.move_multiple_units([(Camel::White, 3), (Camel::Blue, 1)]);
 
-    assert_eq!(res.data, mk_map(&[(16, vec![Camel::Blue, Camel::White])]));
+    assert_eq!(
+        res.data,
+        mk_map(&[(16, vec![Camel::Blue]), (18, vec![Camel::White])])
+    );
     assert!(res.is_finished());
     assert!(desert_hits.is_empty());
 }
@@ -415,9 +422,10 @@ fn oasis_on_16_carries_the_whole_stack_over_the_finish() {
 
     assert_eq!(desert_hit, Some(16));
     assert_eq!(
-        res.data.get(&16),
+        res.data.get(&17),
         Some(&Space::Camels(vec![Camel::White, Camel::Yellow]))
     );
+    assert_eq!(res.data.get(&16), Some(&Space::Desert(DesertTile::Oasis)));
     assert!(res.is_finished());
     // Yellow stays on top of the carried unit, so it is 1st at the finish.
     assert_eq!(
@@ -437,11 +445,9 @@ fn mirage_on_16_is_not_triggered_by_a_dice_overshoot() {
     let (res, desert_hit) = state.move_unit(Camel::White, 3);
 
     assert_eq!(desert_hit, None);
-    assert_eq!(res.data.get(&16), Some(&Space::Camels(vec![Camel::White])));
-    assert!(!res
-        .data
-        .values()
-        .any(|space| matches!(space, Space::Desert(_))));
+    assert_eq!(res.data.get(&18), Some(&Space::Camels(vec![Camel::White])));
+    // The dice move jumped over the tile, so it was never triggered or removed.
+    assert_eq!(res.data.get(&16), Some(&Space::Desert(DesertTile::Mirage)));
     assert!(res.is_finished());
 }
 
@@ -455,15 +461,26 @@ fn finished_state_has_no_desert_placements_to_evaluate() {
 }
 
 #[test]
-fn a_space_beyond_16_already_marks_the_state_finished() {
+fn finished_state_survives_reconstruction_from_data() {
+    let state = State::new(mk_map(&[(16, vec![Camel::White])]));
+    let (finished, _) = state.move_unit(Camel::White, 1);
+
+    let rebuilt = State::new(finished.data.clone());
+    assert!(rebuilt.is_finished());
+    assert_eq!(rebuilt.data, finished.data);
+}
+
+#[test]
+fn only_camels_beyond_16_signal_a_finished_race() {
     use camel_up::{DesertTile, Space};
 
-    // The shared adjacency helper also covers the defensive check in the
-    // crossing branch; a desert at 17 is itself treated as a finished board.
+    let camel_finished = State::new(mk_map(&[(17, vec![Camel::White])]));
+    assert!(camel_finished.is_finished());
+
+    // A desert outside the track is not a legal state, but it must not be
+    // mistaken for a camel that has crossed the finish line.
     let mut map = mk_map(&[(14, vec![Camel::White])]);
-    map.insert(16, Space::Desert(DesertTile::Oasis));
     map.insert(17, Space::Desert(DesertTile::Mirage));
     let state = State::new(map);
-
-    assert!(state.is_finished());
+    assert!(!state.is_finished());
 }

@@ -40,33 +40,28 @@ fn assert_no_adjacent_desert(data: &BTreeMap<u8, Space>, desert_space: u8, neigh
 /// Game state
 #[derive(Clone, Debug)]
 pub struct State {
-    /// Mapping from integer keys to space contents (camels or desert)
+    /// Mapping from integer keys to space contents (camels or desert).
+    ///
+    /// Desert tiles only ever occupy track spaces `1..=MAX_FIELD`. Keys above
+    /// [`MAX_FIELD`] hold camel units that have crossed the finish line; they
+    /// are an off-board representation, not additional track spaces.
     pub data: BTreeMap<u8, Space>,
-    /// Set once a camel unit crosses the finish line; no further moves are legal.
-    finished: bool,
 }
 
 impl State {
-    /// Create a new State from the provided map, with the race still running.
-    ///
-    /// Because `finished` is an internal field, `State { data }` struct
-    /// literals are no longer possible; use this constructor instead.
+    /// Create a new State from the provided map.
     pub fn new(data: BTreeMap<u8, Space>) -> Self {
-        Self::with_finished(data, false)
-    }
-
-    /// Build a state while making the finish flag explicit, so map-to-state
-    /// conversions cannot silently reset a finished race.
-    fn with_finished(data: BTreeMap<u8, Space>, finished: bool) -> Self {
-        State { data, finished }
+        State { data }
     }
 
     /// Whether the race has ended (a camel unit crossed the finish line).
     ///
-    /// States created with [`State::new`] may also contain a space beyond 16;
-    /// that is treated as finished for backwards compatibility.
+    /// A crossing unit is stored at a key greater than [`MAX_FIELD`], so the
+    /// finish condition is fully reconstructible from [`State::data`].
     pub fn is_finished(&self) -> bool {
-        self.finished || self.data.keys().any(|&key| key > MAX_FIELD)
+        self.data
+            .iter()
+            .any(|(&key, space)| key > MAX_FIELD && matches!(space, Space::Camels(_)))
     }
 
     /// Move `camel` forward by `steps` (dice result).
@@ -74,11 +69,11 @@ impl State {
     /// If the moved camel unit hits a desert tile, the key of that desert tile is returned.
     ///
     /// A move that would take the unit past space 16 ends the race. The unit is
-    /// placed on top of space 16 and the state becomes finished (see
-    /// [`State::is_finished`]); no further moves can be made in that state.
-    /// An oasis on space 16 also ends
-    /// the race (its extra forward step crosses the line) and is reported as a
-    /// desert hit.
+    /// placed off the board beyond the finish line (at the dice destination,
+    /// or at space 17 when an oasis on 16 pushes it over), where it still ranks
+    /// ahead of every camel on the track. No further moves can then be made.
+    /// A desert tile on 16 that was not triggered stays on the board; an oasis
+    /// that was hit is reported as a desert hit.
     ///
     /// Panics if:
     /// - the race has already finished
@@ -154,35 +149,34 @@ impl State {
         let crosses_finish = dest_space > MAX_FIELD || (dest_space == MAX_FIELD && oasis_at_dest);
 
         if crosses_finish {
-            // Keep the desert-adjacency check consistent with the normal
-            // desert-effect path, even though the extra step leaves the board.
-            if oasis_at_dest {
-                let forward_space = dest_space
+            // The extra oasis step also crosses the line when the tile is on
+            // space 16. Keys above MAX_FIELD are off-board, so no desert tile
+            // can be present there in a legal state.
+            let finish_space = if oasis_at_dest {
+                dest_space
                     .checked_add(1)
-                    .unwrap_or_else(|| panic!("oasis at {} would overflow u8", dest_space));
-                assert_no_adjacent_desert(&self.data, dest_space, forward_space);
-            }
-
-            // Stop at the finish line and place the unit on top of space 16 so
-            // it ranks ahead of every camel still on the track. A desert tile
-            // on 16 (if the oasis was hit) has already paid out and is returned
-            // at the end of the leg, so it is removed from the board here.
+                    .expect("oasis at space 16 cannot overflow u8")
+            } else {
+                dest_space
+            };
             let desert_hit = if oasis_at_dest {
                 Some(dest_space)
             } else {
                 None
             };
-            match board.get(&MAX_FIELD) {
+
+            // Place the whole unit off the track; its key makes it rank first.
+            match board.get(&finish_space) {
                 Some(Space::Camels(existing)) => {
                     let mut new_vec = existing.clone();
                     new_vec.extend(moving_unit);
-                    board.insert(MAX_FIELD, Space::Camels(new_vec));
+                    board.insert(finish_space, Space::Camels(new_vec));
                 }
                 _ => {
-                    board.insert(MAX_FIELD, Space::Camels(moving_unit));
+                    board.insert(finish_space, Space::Camels(moving_unit));
                 }
             }
-            return (Self::with_finished(board, true), desert_hit);
+            return (State { data: board }, desert_hit);
         }
 
         // Now inspect destination
@@ -190,19 +184,19 @@ impl State {
             None => {
                 // empty space — insert the moving unit
                 board.insert(dest_space, Space::Camels(moving_unit));
-                (Self::with_finished(board, false), None)
+                (State { data: board }, None)
             }
             Some(Space::Camels(existing)) => {
                 // append to existing stack
                 let mut new_vec = existing.clone();
                 new_vec.extend(moving_unit);
                 board.insert(dest_space, Space::Camels(new_vec));
-                (Self::with_finished(board, false), None)
+                (State { data: board }, None)
             }
             Some(Space::Desert(_)) => {
                 // delegate desert-specific behaviour to helper
                 let desert_hit = self.apply_desert_effect(&mut board, dest_space, moving_unit);
-                (Self::with_finished(board, false), desert_hit)
+                (State { data: board }, desert_hit)
             }
         }
     }
@@ -466,7 +460,17 @@ impl State {
             return result;
         }
 
-        let min_key = *self.data.keys().next().unwrap();
+        // Start from the rearmost camel, not the lowest occupied key: an
+        // existing desert behind it is inert and must not widen the range.
+        let min_key = match self
+            .data
+            .iter()
+            .filter_map(|(&key, space)| matches!(space, Space::Camels(_)).then_some(key))
+            .min()
+        {
+            Some(key) => key,
+            None => return result,
+        };
         let bound = MAX_FIELD;
 
         for pos in min_key..=bound {
