@@ -15,6 +15,12 @@ import {
   FINISH_LINE,
   FINISH_OVERFLOW,
   GRID_SIZE,
+  LEG_BET_BAND,
+  LEG_BET_CARD_SIZE,
+  LEG_BET_OVERLAP,
+  LEG_BET_STACK_COUNT,
+  LEG_BET_STACK_SPACING,
+  LEG_BET_TOP_Y,
   MAX_STACKED_CAMELS,
   NUMBER_EDGE_OFFSET,
   SPACE_HEIGHT,
@@ -23,6 +29,8 @@ import {
   getCamelStackCenters,
   getDiceRowCenters,
   getFinishOverflowCenters,
+  getLegBetCardPlacements,
+  getLegBetStackCenters,
   getSpaceCamelCenters,
   getSpaceNumberPlacement,
   isCornerSpace,
@@ -359,5 +367,76 @@ describe("camel layout", () => {
       -CAMEL_HEIGHT * 2.5,
     ]);
     expect(centers.every(({ x }) => x === FINISH_LINE.x)).toBe(true);
+  });
+});
+
+describe("leg-bet card layout", () => {
+  it("places a square card band directly above the board", () => {
+    expect(LEG_BET_BAND.x).toBe(0);
+    expect(LEG_BET_BAND.width).toBe(BOARD_VIEWBOX.width);
+    expect(LEG_BET_BAND.y).toBeLessThan(0);
+    expect(LEG_BET_BAND.y + LEG_BET_BAND.height).toBe(0);
+    expect(LEG_BET_CARD_SIZE).toBeGreaterThan(0);
+  });
+
+  it("centres five evenly spaced stacks across the band", () => {
+    const centers = getLegBetStackCenters();
+
+    expect(LEG_BET_STACK_COUNT).toBe(5);
+    expect(centers).toHaveLength(LEG_BET_STACK_COUNT);
+    expect(centers).toEqual([100, 300, 500, 700, 900]);
+    expect(centers[2]).toBe(BOARD_VIEWBOX.width / 2);
+
+    for (let index = 1; index < centers.length; index += 1) {
+      expect(centers[index] - centers[index - 1]).toBe(LEG_BET_STACK_SPACING);
+    }
+
+    expect(centers[0] - LEG_BET_CARD_SIZE / 2).toBeGreaterThan(LEG_BET_BAND.x);
+    expect(centers[centers.length - 1] + LEG_BET_CARD_SIZE / 2).toBeLessThan(
+      LEG_BET_BAND.x + LEG_BET_BAND.width,
+    );
+  });
+
+  it("leaves the finished-camel overflow lane clear of the card stacks", () => {
+    const centers = getLegBetStackCenters();
+    const leftCardRightEdge = centers[1] + LEG_BET_CARD_SIZE / 2;
+    const rightCardLeftEdge = centers[2] - LEG_BET_CARD_SIZE / 2;
+
+    expect(FINISH_LINE.x).toBeGreaterThan(centers[1]);
+    expect(FINISH_LINE.x).toBeLessThan(centers[2]);
+    expect(FINISH_LINE.x - CAMEL_WIDTH / 2).toBeGreaterThan(leftCardRightEdge);
+    expect(FINISH_LINE.x + CAMEL_WIDTH / 2).toBeLessThan(rightCardLeftEdge);
+  });
+
+  it("shifts each covered tile down by a small overlap", () => {
+    const placements = getLegBetCardPlacements(200, 3);
+
+    expect(placements).toHaveLength(3);
+    expect(placements.map(({ x }) => x)).toEqual([
+      200 - LEG_BET_CARD_SIZE / 2,
+      200 - LEG_BET_CARD_SIZE / 2,
+      200 - LEG_BET_CARD_SIZE / 2,
+    ]);
+    expect(placements.map(({ y }) => y)).toEqual([
+      LEG_BET_TOP_Y,
+      LEG_BET_TOP_Y + LEG_BET_OVERLAP,
+      LEG_BET_TOP_Y + 2 * LEG_BET_OVERLAP,
+    ]);
+    expect(LEG_BET_OVERLAP).toBeGreaterThan(0);
+    expect(LEG_BET_OVERLAP).toBeLessThan(LEG_BET_CARD_SIZE / 2);
+  });
+
+  it("keeps every tile inside the band", () => {
+    const placements = getLegBetCardPlacements(500, 3);
+
+    expect(placements[0].y).toBeGreaterThanOrEqual(LEG_BET_BAND.y);
+    expect(placements[placements.length - 1].y + LEG_BET_CARD_SIZE).toBeLessThanOrEqual(
+      LEG_BET_BAND.y + LEG_BET_BAND.height,
+    );
+  });
+
+  it("returns no placements for an exhausted stack", () => {
+    expect(getLegBetCardPlacements(500, 0)).toEqual([]);
+    expect(getLegBetCardPlacements(500, -1)).toEqual([]);
   });
 });

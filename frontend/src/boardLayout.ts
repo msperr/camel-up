@@ -59,6 +59,55 @@ export const DICE_ADD_BUTTON = {
 } as const;
 
 /**
+ * The leg-bet cards sit in a band directly above the track. Its negative y
+ * values extend beyond the board viewBox, which the board SVG draws with
+ * visible overflow.
+ */
+export const LEG_BET_BAND = {
+  x: 0,
+  y: -190,
+  width: BOARD_VIEWBOX.width,
+  height: 190,
+} as const;
+
+/** Square cards with a small strip of each covered tile left visible. */
+export const LEG_BET_CARD_SIZE = 110;
+export const LEG_BET_OVERLAP = 24;
+export const LEG_BET_TOP_Y = LEG_BET_BAND.y + 12;
+
+/** One stack per camel, evenly spaced across the board. */
+export const LEG_BET_STACK_COUNT = 5;
+/** Leave room for finished camels, which overflow above the finish line at x=400. */
+export const LEG_BET_STACK_SPACING = 200;
+
+/** Top-left corner of a card in board viewBox coordinates. */
+export type LegBetCardPlacement = {
+  readonly x: number;
+  readonly y: number;
+};
+
+/** Centre each stack horizontally, with the middle stack over the board centre. */
+export const getLegBetStackCenters = (count = LEG_BET_STACK_COUNT): readonly number[] =>
+  Array.from(
+    { length: Math.max(0, count) },
+    (_, index) => BOARD_VIEWBOX.width / 2 + (index - (count - 1) / 2) * LEG_BET_STACK_SPACING,
+  );
+
+/**
+ * Place the remaining tiles of one stack. Index 0 is the fully visible top
+ * tile; each tile underneath is shifted down by the overlap so its lower strip
+ * peeks out below the tile in front of it.
+ */
+export const getLegBetCardPlacements = (
+  centerX: number,
+  count: number,
+): readonly LegBetCardPlacement[] =>
+  Array.from({ length: Math.max(0, count) }, (_, index) => ({
+    x: centerX - LEG_BET_CARD_SIZE / 2,
+    y: LEG_BET_TOP_Y + index * LEG_BET_OVERLAP,
+  }));
+
+/**
  * Camel pieces are side-view meeples. Five of them stack tightly inside one
  * 200px field with a small margin above and below.
  */
