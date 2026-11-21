@@ -79,6 +79,31 @@ fn four_camels_moved_simulates_remaining_one() {
 }
 
 #[test]
+fn enumeration_handles_a_finish_during_the_scenario() {
+    let moved = [Camel::Yellow, Camel::Orange, Camel::Green, Camel::Blue];
+    let mut data = BTreeMap::new();
+    data.insert(1, Space::Camels(vec![Camel::Yellow]));
+    data.insert(2, Space::Camels(vec![Camel::Orange]));
+    data.insert(3, Space::Camels(vec![Camel::Green]));
+    data.insert(4, Space::Camels(vec![Camel::Blue]));
+    data.insert(15, Space::Camels(vec![Camel::White]));
+    data.insert(16, Space::Desert(DesertTile::Oasis));
+    let state = State::new(data);
+
+    // Only White remains. Die 1 hits the oasis on 16 and crosses via its extra
+    // step; dice 2 and 3 cross directly without triggering the desert.
+    let (counts, desert_hits) = state.simulate_outcomes(&moved);
+
+    let scenarios = scenario_count(1);
+    assert_eq!(scenarios, 3);
+    assert_eq!(total_for(&counts, Camel::White), scenarios);
+    assert_eq!(counts[&Camel::White][0], scenarios, "crossing camel is 1st");
+
+    // The desert is paid only in the die-1 scenario.
+    assert_eq!(desert_hits.get(&16), Some(&1));
+}
+
+#[test]
 fn partial_composition_matches_full_leg() {
     let state = base_state();
     let (full_counts, full_desert) = state.simulate_outcomes(&[]);

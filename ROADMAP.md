@@ -22,11 +22,12 @@ At a glance
 -----------
 | Type | Wrong behaviour | Latent | Missing feature | Cosmetic | Total |
 |---|---:|---:|---:|---:|---:|
-| Bug | 1 | 0 | 0 | 0 | 1 |
-| Feature | 0 | 0 | 8 | 0 | 8 |
+| Bug | 0 | 0 | 0 | 0 | 0 |
+| Feature | 0 | 0 | 7 | 0 | 7 |
 
-Resolved since the verification: **B-01, B-02, B-04, B-05**. B-03 is retained
-by design: a desert behind the rearmost camel can never be reached (camel
+Resolved since the verification: **B-01, B-02, B-04, F-07**. B-05 was already
+correct in code; only its stale roadmap entry was fixed. B-03 is retained by
+design: a desert behind the rearmost camel can never be reached (camel
 positions never decrease across a move), so excluding those spaces loses no
 coin-relevant outcomes.
 

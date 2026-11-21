@@ -302,6 +302,14 @@ impl State {
     /// camels are permuted and rolled. Passing an empty slice reproduces the
     /// full-leg simulation.
     ///
+    /// Each permutation/dice combination is one equally likely scenario. A
+    /// scenario is simulated with [`State::move_multiple_units`], which stops as
+    /// soon as a camel crosses the finish line; dice for camels later in that
+    /// permutation are then never rolled. Those suffixes still count as distinct
+    /// scenarios (the full set of permutations and dice combinations is the
+    /// denominator), and every camel still receives a ranking in the finished
+    /// state.
+    ///
     /// Rules note: a leg ends once all five racing dice have been revealed. At
     /// that point the dice are returned to the pyramid and a new leg begins, so
     /// there are no moves left to simulate. Passing all five camels is therefore
