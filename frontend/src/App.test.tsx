@@ -640,11 +640,18 @@ describe("App", () => {
     it("exposes the cards outside the board's role=img SVG", () => {
       const { container } = render(<App />);
       const board = screen.getByRole("img", { name: "Camel Up board" });
+      const bettingField = container.querySelector(".betting-field");
       const whiteFive = screen.getByRole("button", { name: "Take White 5 leg-bet tile" });
 
       expect(board.contains(whiteFive)).toBe(false);
-      expect(container.querySelector(".betting-field")).toContainElement(whiteFive);
+      expect(bettingField).toContainElement(whiteFive);
+      expect(bettingField?.querySelector("defs #card-shadow")).toBeInTheDocument();
+      expect(board.querySelector("#card-shadow")).toBeNull();
       expect(screen.getByRole("group", { name: "Leg-betting tiles" })).toBeInTheDocument();
+
+      const gameStyle = container.querySelector(".game")?.getAttribute("style");
+      expect(gameStyle).toContain("--bet-scale: 1.19");
+      expect(gameStyle).toContain("--bet-band-aspect: 1000 / 190");
     });
 
     it("starts with three cards per camel and only the fives available", () => {
@@ -664,6 +671,11 @@ describe("App", () => {
       ]);
       expect(container.querySelectorAll("[data-leg-bet-empty]")).toHaveLength(0);
       expect(screen.getByRole("button", { name: "Take White 5 leg-bet tile" })).toBeEnabled();
+
+      // Covered tiles are painted first, so the top tile is the last sibling.
+      const whiteCards = getBetCardsFor(container, "white");
+      expect(whiteCards.map((card) => card.dataset.legBetValue)).toEqual(["2", "3", "5"]);
+      expect(whiteCards[whiteCards.length - 1]).toHaveAttribute("data-leg-bet-available", "true");
       expect(getCamels(container)).toHaveLength(0);
     });
 
@@ -708,19 +720,23 @@ describe("App", () => {
       expect(screen.queryByRole("button", { name: /Take White/ })).toBeNull();
     });
 
-    it("takes a card with Enter and Space", () => {
+    it("keeps keyboard focus on the revealed tile and moves it to Clear when exhausted", async () => {
       render(<App />);
 
       const five = screen.getByRole("button", { name: "Take Blue 5 leg-bet tile" });
       five.focus();
       fireEvent.keyDown(five, { key: "Enter" });
 
-      expect(screen.getByRole("button", { name: "Take Blue 3 leg-bet tile" })).toBeInTheDocument();
-
       const three = screen.getByRole("button", { name: "Take Blue 3 leg-bet tile" });
+      expect(three).toHaveFocus();
       fireEvent.keyDown(three, { key: " " });
 
-      expect(screen.getByRole("button", { name: "Take Blue 2 leg-bet tile" })).toBeInTheDocument();
+      const two = screen.getByRole("button", { name: "Take Blue 2 leg-bet tile" });
+      expect(two).toHaveFocus();
+      fireEvent.keyDown(two, { key: "Enter" });
+
+      await waitFor(() => expect(screen.getByRole("button", { name: "Clear" })).toHaveFocus());
+      expect(screen.queryByRole("button", { name: /Take Blue/ })).toBeNull();
     });
 
     it("disables every top card once five dice are thrown", () => {
@@ -732,6 +748,7 @@ describe("App", () => {
         const card = screen.getByRole("button", { name: `Take ${label} 5 leg-bet tile` });
         expect(card).toHaveAttribute("aria-disabled", "true");
         fireEvent.click(card);
+        fireEvent.keyDown(card, { key: "Enter" });
       }
 
       expect(getBetCards(container)).toHaveLength(15);

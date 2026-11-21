@@ -77,7 +77,8 @@ export const LEG_BET_TOP_Y = LEG_BET_BAND.y + 12;
 
 /** One stack per camel, evenly spaced across the board. */
 export const LEG_BET_STACK_COUNT = 5;
-export const LEG_BET_STACK_SPACING = 180;
+/** Leave room for finished camels, which overflow above the finish line at x=400. */
+export const LEG_BET_STACK_SPACING = 200;
 
 /** Top-left corner of a card in board viewBox coordinates. */
 export type LegBetCardPlacement = {
@@ -94,8 +95,8 @@ export const getLegBetStackCenters = (count = LEG_BET_STACK_COUNT): readonly num
 
 /**
  * Place the remaining tiles of one stack. Index 0 is the fully visible top
- * tile; each tile underneath is shifted down by the overlap so its top strip
- * stays visible.
+ * tile; each tile underneath is shifted down by the overlap so its lower strip
+ * peeks out below the tile in front of it.
  */
 export const getLegBetCardPlacements = (
   centerX: number,

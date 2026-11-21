@@ -35,8 +35,8 @@ import {
   type RaceState,
 } from "./camelRace";
 import {
-  LEG_BET_VALUES,
   createLegBetState,
+  getLegBetValues,
   hasTakenLegBet,
   takeLegBet,
   type LegBetState,
@@ -483,6 +483,10 @@ export default function App() {
       return;
     }
 
+    if (legBets[color] === 1) {
+      setFocusAfterClose("clear");
+    }
+
     setLegBets((current) => takeLegBet(current, color));
   };
 
@@ -525,6 +529,12 @@ export default function App() {
     "--add-die-size": `${(DICE_ADD_BUTTON.size / BOARD_VIEWBOX.width) * 100}cqw`,
   } as CSSProperties;
 
+  // Keep the CSS band sizing in sync with the SVG layout constants.
+  const bettingBandStyle = {
+    "--bet-scale": 1 + LEG_BET_BAND.height / BOARD_VIEWBOX.width,
+    "--bet-band-aspect": `${BOARD_VIEWBOX.width} / ${LEG_BET_BAND.height}`,
+  } as CSSProperties;
+
   const camelPieces = BOARD_SPACES.flatMap((space) => {
     const stack = race.stacks[space.space] ?? [];
     const centers = getSpaceCamelCenters(space.space, stack.length);
@@ -545,7 +555,7 @@ export default function App() {
 
   const legBetStacks = CAMEL_COLORS.map((color, colorIndex) => {
     const remaining = legBets[color];
-    const values = LEG_BET_VALUES.slice(LEG_BET_VALUES.length - remaining);
+    const values = getLegBetValues(remaining);
     const centerX = LEG_BET_CENTERS[colorIndex];
     const placements = getLegBetCardPlacements(centerX, values.length);
 
@@ -567,13 +577,19 @@ export default function App() {
       );
     }
 
-    // Paint covered tiles first so the fully visible top tile is on top.
+    // Paint covered tiles first so the fully visible top tile is on top. Keying
+    // by stack position keeps the focused node when the tile it shows changes.
     return values
-      .map((value, index) => ({ value, placement: placements[index], topCard: index === 0 }))
+      .map((value, index) => ({
+        key: `${color}-${index}`,
+        value,
+        placement: placements[index],
+        topCard: index === 0,
+      }))
       .reverse()
-      .map(({ value, placement, topCard }) => (
+      .map(({ key, value, placement, topCard }) => (
         <LegBetCard
-          key={`${color}-${value}`}
+          key={key}
           color={color}
           value={value}
           x={placement.x}
@@ -590,7 +606,7 @@ export default function App() {
       <div className="page-content" inert={isDialogOpen} data-page-content="true">
         <h1 className="sr-only">Camel Up board</h1>
 
-        <div className="game">
+        <div className="game" style={bettingBandStyle}>
           <div className="board-stack">
             <svg
               className="betting-field"

@@ -3,7 +3,7 @@ import { CAMEL_COLORS } from "./camelRace";
 import {
   LEG_BET_VALUES,
   createLegBetState,
-  getTopLegBetValue,
+  getLegBetValues,
   hasTakenLegBet,
   takeLegBet,
 } from "./legBets";
@@ -19,28 +19,30 @@ describe("leg-bet tile state", () => {
     expect(hasTakenLegBet(state)).toBe(false);
   });
 
-  it("maps the remaining tile count to the top tile value", () => {
-    expect(getTopLegBetValue(3)).toBe(5);
-    expect(getTopLegBetValue(2)).toBe(3);
-    expect(getTopLegBetValue(1)).toBe(2);
-    expect(getTopLegBetValue(0)).toBeNull();
+  it("maps the remaining tile count to the available tile values", () => {
+    expect(getLegBetValues(3)).toEqual([5, 3, 2]);
+    expect(getLegBetValues(2)).toEqual([3, 2]);
+    expect(getLegBetValues(1)).toEqual([2]);
+    expect(getLegBetValues(0)).toEqual([]);
+    expect(getLegBetValues(-1)).toEqual([]);
+    expect(getLegBetValues(4)).toEqual([5, 3, 2]);
   });
 
   it("takes tiles from the top: 5 first, then 3, then 2", () => {
     let state = createLegBetState();
 
-    expect(getTopLegBetValue(state.white)).toBe(5);
+    expect(getLegBetValues(state.white)).toEqual([5, 3, 2]);
     state = takeLegBet(state, "white");
     expect(state.white).toBe(2);
-    expect(getTopLegBetValue(state.white)).toBe(3);
+    expect(getLegBetValues(state.white)).toEqual([3, 2]);
 
     state = takeLegBet(state, "white");
     expect(state.white).toBe(1);
-    expect(getTopLegBetValue(state.white)).toBe(2);
+    expect(getLegBetValues(state.white)).toEqual([2]);
 
     state = takeLegBet(state, "white");
     expect(state.white).toBe(0);
-    expect(getTopLegBetValue(state.white)).toBeNull();
+    expect(getLegBetValues(state.white)).toEqual([]);
   });
 
   it("leaves an exhausted stack empty and unchanged", () => {

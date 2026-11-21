@@ -46,10 +46,13 @@ body {
 }
 
 .game {
-  /* The leg-bet band occupies 19% of the board width above the square board. */
+  /* --bet-scale and --bet-band-aspect come from the SVG layout constants. */
   --board-size: min(
     calc(100vw - 2 * var(--page-gutter)),
-    calc((100svh - 2 * var(--page-gutter) - var(--controls-height) - var(--controls-gap)) / 1.19),
+    calc(
+      (100svh - 2 * var(--page-gutter) - var(--controls-height) - var(--controls-gap)) /
+        var(--bet-scale)
+    ),
     1000px
   );
   display: grid;
@@ -65,9 +68,11 @@ body {
 }
 
 .betting-field {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 100%;
-  aspect-ratio: 1000 / 190;
+  aspect-ratio: var(--bet-band-aspect);
 }
 
 .board-frame {

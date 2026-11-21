@@ -384,7 +384,7 @@ describe("leg-bet card layout", () => {
 
     expect(LEG_BET_STACK_COUNT).toBe(5);
     expect(centers).toHaveLength(LEG_BET_STACK_COUNT);
-    expect(centers).toEqual([140, 320, 500, 680, 860]);
+    expect(centers).toEqual([100, 300, 500, 700, 900]);
     expect(centers[2]).toBe(BOARD_VIEWBOX.width / 2);
 
     for (let index = 1; index < centers.length; index += 1) {
@@ -395,6 +395,17 @@ describe("leg-bet card layout", () => {
     expect(centers[centers.length - 1] + LEG_BET_CARD_SIZE / 2).toBeLessThan(
       LEG_BET_BAND.x + LEG_BET_BAND.width,
     );
+  });
+
+  it("leaves the finished-camel overflow lane clear of the card stacks", () => {
+    const centers = getLegBetStackCenters();
+    const leftCardRightEdge = centers[1] + LEG_BET_CARD_SIZE / 2;
+    const rightCardLeftEdge = centers[2] - LEG_BET_CARD_SIZE / 2;
+
+    expect(FINISH_LINE.x).toBeGreaterThan(centers[1]);
+    expect(FINISH_LINE.x).toBeLessThan(centers[2]);
+    expect(FINISH_LINE.x - CAMEL_WIDTH / 2).toBeGreaterThan(leftCardRightEdge);
+    expect(FINISH_LINE.x + CAMEL_WIDTH / 2).toBeLessThan(rightCardLeftEdge);
   });
 
   it("shifts each covered tile down by a small overlap", () => {

@@ -18,9 +18,12 @@ export type LegBetState = Readonly<Record<CamelColor, number>>;
 export const createLegBetState = (): LegBetState =>
   Object.fromEntries(CAMEL_COLORS.map((color) => [color, LEG_BET_VALUES.length])) as LegBetState;
 
-/** The tile that is currently fully visible and available for that camel. */
-export const getTopLegBetValue = (remaining: number): LegBetValue | null =>
-  remaining > 0 ? LEG_BET_VALUES[LEG_BET_VALUES.length - remaining] : null;
+/** Tiles still available in a stack, ordered from the top tile downwards. */
+export const getLegBetValues = (remaining: number): readonly LegBetValue[] => {
+  const count = Math.max(0, Math.min(remaining, LEG_BET_VALUES.length));
+
+  return LEG_BET_VALUES.slice(LEG_BET_VALUES.length - count);
+};
 
 /** Take the top tile of one stack. An exhausted stack stays exhausted. */
 export const takeLegBet = (state: LegBetState, color: CamelColor): LegBetState => {
