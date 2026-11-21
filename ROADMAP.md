@@ -22,8 +22,18 @@ At a glance
 -----------
 | Type | Wrong behaviour | Latent | Missing feature | Cosmetic | Total |
 |---|---:|---:|---:|---:|---:|
-| Bug | 3 | 1 | 0 | 1 | 5 |
-| Feature | 0 | 0 | 8 | 0 | 8 |
+| Bug | 0 | 0 | 0 | 0 | 0 |
+| Feature | 0 | 0 | 7 | 0 | 7 |
+
+Resolved since the verification: **B-01, B-02, B-04, F-07**. B-05 was already
+correct in code; only its stale roadmap entry was fixed. B-03 is retained by
+design: a desert behind the rearmost camel can never be reached (camel
+positions never decrease across a move), so excluding those spaces loses no
+coin-relevant outcomes.
+
+API note: `MAX_FIELD` is now public and re-exported. Keys above 16 in
+`State::data` hold camel units that have crossed the finish line; desert tiles
+remain confined to track spaces `1..=16`.
 
 Priority: **P0** blocks the repository purpose (evaluating actions by expected
 coins); **P1** is required for a usable evaluator; **P2** is completeness or
@@ -49,6 +59,12 @@ Bugs
 - **Next step:** Detect the crossing, stop the movement, and expose a
   race-finished state; use the same boundary in movement and evaluation; add
   tests for exact finish and overshoot.
+- **Status:** Resolved on `fix/rust-core-bugs`. `MAX_FIELD` is now a single
+  public constant used for movement and evaluation; the Monte Carlo module
+  delegates to `State::is_finished()`. A crossing unit is placed off the track
+  at a key greater than 16 (17 for an oasis on space 16, otherwise the dice
+  destination), so the finish state is encoded in `data` and survives
+  reconstruction. `move_multiple_units` stops at the finish.
 
 ### B-02 — Ranking index is reversed in simulation — P0
 
@@ -67,6 +83,9 @@ Bugs
   (reverse of `order()`), use it in `simulate_outcomes`, document the index
   convention, and test multi-camel stacks where 1st and 2nd are in the same
   stack.
+- **Status:** Resolved on `fix/rust-core-bugs`. `State::ranking()` returns 1st
+  through last, `simulate_outcomes` uses it (index 0 is 1st), and the convention
+  is documented and tested.
 
 ### B-03 — Desert candidate list misses legal spaces — P2
 
@@ -81,9 +100,15 @@ Bugs
 - **Impact:** The API does not actually evaluate "each position"; in the 2014
   game a tile behind all camels is likely to be inert, so the immediate coin
   impact is low, but the candidate set is still incomplete.
-- **Next step:** Iterate the full legal track range (for example 2..=16)
+- ~~**Next step:** Iterate the full legal track range (for example 2..=16)
   independently of `min_key`; add a test with a state whose rearmost camel is
-  ahead of unused spaces.
+  ahead of unused spaces.~~ Superseded by the status below.
+- **Status:** Retained by design. A camel's position never decreases across a
+  move (dice and oasis move forward; a mirage moves back one from a space the
+  unit just reached by moving forward), so a desert strictly behind the
+  rearmost camel cannot be triggered. No coin-relevant outcomes are lost; the
+  candidate range starts at the lowest camel key, so an inert desert behind the
+  camels does not widen it.
 
 ### B-04 — Space 1 is not explicitly excluded — P3
 
@@ -99,6 +124,8 @@ Bugs
 - **Impact:** Only malformed/internal states are affected.
 - **Next step:** Add the explicit `pos != 1` check and a regression test. The
   proposed B-03 range (`2..=16`) would also avoid this.
+- **Status:** Resolved on `fix/rust-core-bugs` with an explicit `pos == 1`
+  guard and a regression test using a malformed key below 1.
 
 ### B-05 — Stale panic message — P3
 
@@ -108,6 +135,9 @@ Bugs
 - **Finding:** The panic message refers to `tally_outcomes`, an old API name.
 - **Impact:** Diagnostics only.
 - **Next step:** Rename the message to `simulate_outcomes`.
+- **Status:** Already resolved in the code at verification time (the roadmap
+  entry was stale): all panic messages in `simulate_outcomes` use the current
+  name, and no `tally_outcomes` text remains outside this document.
 
 Features
 --------
@@ -187,8 +217,12 @@ Features
   not condition on which dice remain in the pyramid.
 - **Impact:** Results are valid only for a complete leg. Using them for the final
   leg, or for a mid-leg decision, can produce invalid probabilities.
-- **Next step:** Add a race-finished/partial-leg mode and a conditional
-  simulation seeded with the remaining dice.
+- ~~**Next step:** Add a race-finished/partial-leg mode and a conditional
+  simulation seeded with the remaining dice.~~ Superseded by the status below.
+- **Status:** Resolved on `fix/rust-core-bugs`. `simulate_outcomes` panics on a
+  finished state, accepts `already_moved` to simulate only the remainder of a
+  leg, and derives the remaining camel dice from that list. `move_multiple_units`
+  stops at the crossing, so no moves are simulated after the race ends.
 
 ### F-08 — Input and invariant validation — P2
 
@@ -206,13 +240,19 @@ Features
 
 Suggested order
 ---------------
-1. **Fix B-01 and B-02** — the current results can be wrong even for the
-   implemented movement-only subset.
+B-01, B-02, B-04 and B-05 are complete on branch `fix/rust-core-bugs`. B-03 is
+deliberately out of scope (see its status above). F-07 was completed as part of
+the race-finish work.
+
+1. ~~**Fix B-01 and B-02** — the current results can be wrong even for the
+   implemented movement-only subset.~~ Complete on `fix/rust-core-bugs`.
 2. **Build F-01** — the shared player/leg/action state is the foundation for all
    coin calculations.
 3. **Add F-02, F-03, F-04, F-05** — score the four actions and their expected
    payouts.
-4. **Add F-07** — make the evaluator valid for the final leg and mid-leg
-   decisions.
-5. **Finish B-03, B-04, F-06, F-08** — completeness and robustness.
-6. **Clean up B-05** — cosmetic.
+4. ~~**Add F-07** — make the evaluator valid for the final leg and mid-leg
+   decisions.~~ Complete on `fix/rust-core-bugs`.
+5. **Finish F-06, F-08** — completeness and robustness (B-03 is intentionally
+   excluded; B-04 is resolved).
+6. ~~**Clean up B-05** — cosmetic.~~ Already fixed in code before verification;
+   only the stale roadmap entry was corrected.
