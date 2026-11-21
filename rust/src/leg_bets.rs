@@ -1,4 +1,4 @@
-//! Expected Egyptian Pound (EP) payout for taking a leg-bet tile.
+//! Expected coin (Egyptian Pound, EP) payout for taking a leg-bet tile.
 //!
 //! RULES.md section 5 defines the payout of one leg-betting tile at leg scoring:
 //! the printed value (5, 3 or 2) if the camel is 1st, +1 if it is 2nd, and −1
@@ -7,24 +7,24 @@
 //! `v * p1 + 1 * p2 - 1 * (1 - p1 - p2) = (v + 1) * p1 + 2 * p2 - 1`.
 //!
 //! This module does not model players, turn order, or tiles already held: it
-//! answers only what one additional tile is worth from the current board.
+//! answers only what one additional tile is worth from the current board. It
+//! also assumes no further player actions (such as placing a desert tile)
+//! happen before the remaining dice are revealed; that matches the crate's
+//! board-only model, where only camel movement is simulated.
 
+use crate::simulation::CAMEL_ORDER;
 use crate::{Camel, State};
 use std::collections::BTreeMap;
 
-const CAMEL_ORDER: [Camel; 5] = [
-    Camel::White,
-    Camel::Yellow,
-    Camel::Orange,
-    Camel::Green,
-    Camel::Blue,
-];
+/// Legal tile values in stack order, top first (RULES.md section 3).
+const LEG_BET_VALUES: [u8; 3] = [5, 3, 2];
 
 /// Tiles still available in each camel's leg-bet stack, top tile first.
 ///
-/// Stacks are built 5, 3, 2 from the top (RULES.md section 3), so legal values
-/// are 5, 3 or 2 in descending order. An empty vector or a missing entry means
-/// that camel has no tile left; only the first (top) value is used.
+/// Stacks are built 5, 3, 2 from the top (RULES.md section 3), so entries must
+/// form a contiguous run of those values in descending order. An empty vector
+/// or a missing entry means that camel has no tile left; only the first (top)
+/// value is used.
 pub type AvailableLegBets = BTreeMap<Camel, Vec<u8>>;
 
 /// Expected EP of taking each camel's top available leg-bet tile.
@@ -64,14 +64,17 @@ pub fn expected_leg_bet_coins(
     for (&camel, tiles) in available {
         for &value in tiles {
             assert!(
-                matches!(value, 5 | 3 | 2),
+                LEG_BET_VALUES.contains(&value),
                 "expected_leg_bet_coins: invalid leg-bet tile value {} for camel {:?}",
                 value,
                 camel
             );
         }
         assert!(
-            tiles.windows(2).all(|pair| pair[0] > pair[1]),
+            tiles.is_empty()
+                || LEG_BET_VALUES
+                    .windows(tiles.len())
+                    .any(|window| window == tiles.as_slice()),
             "expected_leg_bet_coins: tiles for camel {:?} must be ordered 5, 3, 2",
             camel
         );

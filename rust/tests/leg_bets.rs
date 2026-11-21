@@ -232,6 +232,14 @@ fn unordered_stack_panics() {
 }
 
 #[test]
+#[should_panic(expected = "must be ordered 5, 3, 2")]
+fn non_contiguous_stack_panics() {
+    let mut bets = top_tiles(&[(Camel::Blue, 5)]);
+    bets.insert(Camel::Blue, vec![5, 2]);
+    expected_leg_bet_coins(&single_die_state(), &bets, &FOUR_MOVED);
+}
+
+#[test]
 #[should_panic(expected = "appears multiple times in already_moved")]
 fn duplicate_moved_camel_panics() {
     let bets = top_tiles(&[(Camel::Blue, 5)]);
