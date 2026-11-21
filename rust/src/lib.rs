@@ -1,8 +1,10 @@
 pub mod combinatorics;
+pub mod leg_bets;
 pub mod simulation;
 pub mod state;
 
 pub use combinatorics::{Permutations, Product};
+pub use leg_bets::{expected_leg_bet_coins, AvailableLegBets};
 pub use simulation::{
     simulate_overall_winner_loser, simulate_overall_winner_loser_with, OverallOdds,
 };

@@ -164,6 +164,24 @@ fn duplicate_already_moved_panics() {
 }
 
 #[test]
+fn position_index_zero_is_first_place() {
+    let mut data = BTreeMap::new();
+    data.insert(2, Space::Camels(vec![Camel::Green]));
+    data.insert(3, Space::Camels(vec![Camel::Orange]));
+    data.insert(4, Space::Camels(vec![Camel::Yellow]));
+    data.insert(5, Space::Camels(vec![Camel::White]));
+    data.insert(6, Space::Camels(vec![Camel::Blue]));
+
+    let moved = [Camel::White, Camel::Yellow, Camel::Orange, Camel::Green];
+    let (counts, _) = State::new(data).simulate_outcomes(&moved);
+
+    // Blue's three possible dice results all leave it in front.
+    assert_eq!(counts[&Camel::Blue][0], 3);
+    assert_eq!(counts[&Camel::Blue][1..].iter().sum::<usize>(), 0);
+    assert_eq!(counts[&Camel::White][1], 3);
+}
+
+#[test]
 #[should_panic(expected = "camel Blue appears 0 times")]
 fn missing_camel_in_state_panics() {
     let mut map = base_map();
