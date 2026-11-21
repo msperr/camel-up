@@ -216,8 +216,12 @@ Features
   not condition on which dice remain in the pyramid.
 - **Impact:** Results are valid only for a complete leg. Using them for the final
   leg, or for a mid-leg decision, can produce invalid probabilities.
-- **Next step:** Add a race-finished/partial-leg mode and a conditional
-  simulation seeded with the remaining dice.
+- ~~**Next step:** Add a race-finished/partial-leg mode and a conditional
+  simulation seeded with the remaining dice.~~ Superseded by the status below.
+- **Status:** Resolved on `fix/rust-core-bugs`. `simulate_outcomes` panics on a
+  finished state, accepts `already_moved` to simulate only the remainder of a
+  leg, and derives the remaining camel dice from that list. `move_multiple_units`
+  stops at the crossing, so no moves are simulated after the race ends.
 
 ### F-08 — Input and invariant validation — P2
 
@@ -235,18 +239,18 @@ Features
 
 Suggested order
 ---------------
-Steps 1 and 2 (B-04) are complete on branch `fix/rust-core-bugs`. B-03 is
-deliberately out of scope (see its status above). B-05 was already fixed in the
-code before verification; only its stale roadmap entry was corrected.
+B-01, B-02, B-04 and B-05 are complete on branch `fix/rust-core-bugs`. B-03 is
+deliberately out of scope (see its status above). F-07 was completed as part of
+the race-finish work.
 
-1. **Fix B-01 and B-02** — the current results can be wrong even for the
-   implemented movement-only subset.
+1. ~~**Fix B-01 and B-02** — the current results can be wrong even for the
+   implemented movement-only subset.~~ Complete on `fix/rust-core-bugs`.
 2. **Build F-01** — the shared player/leg/action state is the foundation for all
    coin calculations.
 3. **Add F-02, F-03, F-04, F-05** — score the four actions and their expected
    payouts.
-4. **Add F-07** — make the evaluator valid for the final leg and mid-leg
-   decisions.
+4. ~~**Add F-07** — make the evaluator valid for the final leg and mid-leg
+   decisions.~~ Complete on `fix/rust-core-bugs`.
 5. **Finish F-06, F-08** — completeness and robustness (B-03 is intentionally
    excluded; B-04 is resolved).
 6. ~~**Clean up B-05** — cosmetic.~~ Already fixed in code before verification;

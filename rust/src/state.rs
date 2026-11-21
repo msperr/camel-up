@@ -72,14 +72,15 @@ impl State {
     /// placed off the board beyond the finish line (at the dice destination,
     /// or at space 17 when an oasis on 16 pushes it over), where it still ranks
     /// ahead of every camel on the track. No further moves can then be made.
-    /// A desert tile on 16 that was not triggered stays on the board; an oasis
-    /// that was hit is reported as a desert hit.
+    /// A desert tile on 16 that was not triggered stays on the board. An oasis
+    /// that was hit is reported as a desert hit and also stays until end of leg.
     ///
     /// Panics if:
     /// - the race has already finished
     /// - `steps < 1`
     /// - `camel` is not found in `data`
     /// - `camel` appears more than once in `data`
+    /// - the move would overflow `u8`
     /// - precondition violated: if a desert is adjacent to another desert in the direction moved
     pub fn move_unit(&self, camel: Camel, steps: u8) -> (Self, Option<u8>) {
         if self.is_finished() {
