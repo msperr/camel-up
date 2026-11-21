@@ -164,6 +164,11 @@ Features
 - **Impact:** Action 1 ("take a leg-betting tile") cannot be valued.
 - **Next step:** Model ticket stacks and ownership, implement the leg scoring
   table, and expose `p1`/`p2`-based EV.
+- **Status:** Partially addressed on `feat/leg-bet-ev` (PR #13).
+  `expected_leg_bet_coins` exposes the `p1`/`p2`-based EV from RULES.md section 5
+  and accepts the per-colour 5/3/2 stacks via `AvailableLegBets`. Player
+  ownership and the leg-scoring/EP state are still missing and remain tied to
+  F-01.
 
 ### F-03 — Pyramid-ticket scoring — P1
 
@@ -249,7 +254,8 @@ the race-finish work.
 2. **Build F-01** — the shared player/leg/action state is the foundation for all
    coin calculations.
 3. **Add F-02, F-03, F-04, F-05** — score the four actions and their expected
-   payouts.
+   payouts. F-02's `p1`/`p2` leg-bet EV is in place on `feat/leg-bet-ev`; its
+   ownership/scoring state still depends on F-01.
 4. ~~**Add F-07** — make the evaluator valid for the final leg and mid-leg
    decisions.~~ Complete on `fix/rust-core-bugs`.
 5. **Finish F-06, F-08** — completeness and robustness (B-03 is intentionally

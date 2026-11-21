@@ -6,6 +6,7 @@ A small Rust library implementing a minimal model for a camel race game:
  - State struct with a BTreeMap-based space layout (Space) and move logic
    - Public API highlights: State::move_unit, State::move_multiple_units, State::simulate_outcomes, State::evaluate_desert_placements
    - `State::simulate_outcomes(&already_moved)` simulates only the camels that have not moved yet; pass an empty slice for a full leg. Passing all five camels panics because the leg is already over. In partial mode the returned desert counts cover only the remaining moves; hits from already-revealed moves are not included.
+ - Expected leg-bet payouts: `expected_leg_bet_coins(state, available, already_moved)` and the `AvailableLegBets` tile-stack type, derived from the exhaustive outcome enumeration
  - Combinatorics utilities: Permutations and Product iterators
  - Integration tests exercising combinatorics and state move semantics
 
@@ -46,6 +47,7 @@ Build / Run / Test
 - Run a single integration test file:
   - `cargo test --test combinatorics`
   - `cargo test --test desert_tiles`
+  - `cargo test --test leg_bets`
   - `cargo test --test state`
 - Run a single test by name (substring match): `cargo test <test_name>`
 - Run tests verbosely / show output: `cargo test -- --nocapture`
@@ -87,10 +89,12 @@ Repository Layout
   - src/
     - lib.rs
     - state.rs
+    - leg_bets.rs
     - combinatorics.rs
   - tests/
     - combinatorics.rs
     - desert_tiles.rs
+    - leg_bets.rs
     - state.rs
 - frontend/
   - index.html
