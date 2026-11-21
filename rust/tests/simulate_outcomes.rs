@@ -157,3 +157,50 @@ fn duplicate_camel_in_state_panics() {
 
     state.simulate_outcomes(&[]);
 }
+
+#[test]
+fn ranking_is_first_place_to_last_place() {
+    // Advanced stack at 3: [Green, Blue] (Blue on top); rear stack at 1.
+    let mut map = BTreeMap::new();
+    map.insert(1, Space::Camels(vec![Camel::White, Camel::Yellow]));
+    map.insert(3, Space::Camels(vec![Camel::Green, Camel::Blue]));
+    let state = State::new(map);
+
+    assert_eq!(
+        state.order(),
+        vec![Camel::White, Camel::Yellow, Camel::Green, Camel::Blue]
+    );
+    assert_eq!(
+        state.ranking(),
+        vec![Camel::Blue, Camel::Green, Camel::Yellow, Camel::White]
+    );
+}
+
+#[test]
+fn outcome_vectors_are_indexed_by_finishing_position() {
+    // Only Blue remains: wherever its die takes it (3, 4 or 5) it is ahead of
+    // the stack on space 1, so it must be 1st in all three scenarios.
+    let mut map = BTreeMap::new();
+    map.insert(
+        1,
+        Space::Camels(vec![
+            Camel::White,
+            Camel::Yellow,
+            Camel::Orange,
+            Camel::Green,
+        ]),
+    );
+    map.insert(2, Space::Camels(vec![Camel::Blue]));
+    let state = State::new(map);
+
+    let moved = [Camel::White, Camel::Yellow, Camel::Orange, Camel::Green];
+    let (counts, _) = state.simulate_outcomes(&moved);
+
+    assert_eq!(counts[&Camel::Blue][0], 3);
+    assert_eq!(counts[&Camel::Blue][1..].iter().sum::<usize>(), 0);
+    // Inside the stack at space 1 the ranking runs from the top down.
+    assert_eq!(counts[&Camel::Green][1], 3);
+    assert_eq!(counts[&Camel::Orange][2], 3);
+    assert_eq!(counts[&Camel::Yellow][3], 3);
+    assert_eq!(counts[&Camel::White][4], 3);
+}

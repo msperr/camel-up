@@ -435,3 +435,21 @@ fn test_move_all_camels_various_steps_with_deserts() {
         );
     }
 }
+
+#[test]
+fn test_desert_placement_never_proposes_space_1() {
+    // A malformed state with a key below 1 used to let the loop propose space 1.
+    // Even then, the rules forbid placing a desert tile there.
+    let mut map = BTreeMap::new();
+    map.insert(0, Space::Camels(vec![Camel::White, Camel::Yellow]));
+    map.insert(
+        5,
+        Space::Camels(vec![Camel::Orange, Camel::Green, Camel::Blue]),
+    );
+    let state = State::new(map);
+
+    let placements = state.evaluate_desert_placements();
+
+    assert!(!placements.contains_key(&1));
+    assert!(placements.contains_key(&2));
+}

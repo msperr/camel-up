@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-// Maximum field index (inclusive)
-const MAX_FIELD: u8 = 16;
+/// Highest numbered space on the race track (inclusive). Crossing it ends the race.
+pub const MAX_FIELD: u8 = 16;
 
 /// Camel colors
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -32,24 +32,47 @@ pub enum Space {
 pub struct State {
     /// Mapping from integer keys to space contents (camels or desert)
     pub data: BTreeMap<u8, Space>,
+    /// Set once a camel unit crosses the finish line; no further moves are legal.
+    finished: bool,
 }
 
 impl State {
-    /// Create a new State from the provided map
+    /// Create a new State from the provided map, with the race still running.
     pub fn new(data: BTreeMap<u8, Space>) -> Self {
-        State { data }
+        State {
+            data,
+            finished: false,
+        }
+    }
+
+    /// Whether the race has ended (a camel unit crossed the finish line).
+    ///
+    /// States created with [`State::new`] may also contain a space beyond 16;
+    /// that is treated as finished for backwards compatibility.
+    pub fn is_finished(&self) -> bool {
+        self.finished || self.data.keys().any(|&key| key > MAX_FIELD)
     }
 
     /// Move `camel` forward by `steps` (dice result).
     /// Returns (new_state, optional_desert_space_key)
     /// If the moved camel unit hits a desert tile, the key of that desert tile is returned.
     ///
+    /// A move that would take the unit past space 16 ends the race. The unit is
+    /// placed on top of space 16 and [`State::is_finished`] becomes true; no
+    /// further moves can be made in that state. An oasis on space 16 also ends
+    /// the race (its extra forward step crosses the line) and is reported as a
+    /// desert hit.
+    ///
     /// Panics if:
+    /// - the race has already finished
     /// - `steps < 1`
     /// - `camel` is not found in `data`
     /// - `camel` appears more than once in `data`
     /// - precondition violated: if a desert is adjacent to another desert in the direction moved
     pub fn move_unit(&self, camel: Camel, steps: u8) -> (Self, Option<u8>) {
+        if self.is_finished() {
+            panic!("cannot move a unit after the race has finished");
+        }
         if steps == 0 {
             panic!("steps must be >= 1, got 0");
         }
@@ -105,24 +128,79 @@ impl State {
             board.insert(src_space, Space::Camels(src_stack));
         }
 
+        // The unit crosses the line if the dice move lands past space 16, or if
+        // an oasis on space 16 would push it one space further.
+        let oasis_at_dest = matches!(
+            board.get(&dest_space),
+            Some(Space::Desert(DesertTile::Oasis))
+        );
+        let crosses_finish = dest_space > MAX_FIELD || (dest_space == MAX_FIELD && oasis_at_dest);
+
+        if crosses_finish {
+            // Stop at the finish line and place the unit on top of space 16 so
+            // it ranks ahead of every camel still on the track. A desert tile
+            // on 16 (if the oasis was hit) has already paid out and is returned
+            // at the end of the leg, so it is removed from the board here.
+            let desert_hit = if oasis_at_dest {
+                Some(dest_space)
+            } else {
+                None
+            };
+            match board.get(&MAX_FIELD) {
+                Some(Space::Camels(existing)) => {
+                    let mut new_vec = existing.clone();
+                    new_vec.extend(moving_unit);
+                    board.insert(MAX_FIELD, Space::Camels(new_vec));
+                }
+                _ => {
+                    board.insert(MAX_FIELD, Space::Camels(moving_unit));
+                }
+            }
+            return (
+                State {
+                    data: board,
+                    finished: true,
+                },
+                desert_hit,
+            );
+        }
+
         // Now inspect destination
         match board.get(&dest_space) {
             None => {
                 // empty space — insert the moving unit
                 board.insert(dest_space, Space::Camels(moving_unit));
-                (State { data: board }, None)
+                (
+                    State {
+                        data: board,
+                        finished: false,
+                    },
+                    None,
+                )
             }
             Some(Space::Camels(existing)) => {
                 // append to existing stack
                 let mut new_vec = existing.clone();
                 new_vec.extend(moving_unit);
                 board.insert(dest_space, Space::Camels(new_vec));
-                (State { data: board }, None)
+                (
+                    State {
+                        data: board,
+                        finished: false,
+                    },
+                    None,
+                )
             }
             Some(Space::Desert(_)) => {
                 // delegate desert-specific behaviour to helper
                 let desert_hit = self.apply_desert_effect(&mut board, dest_space, moving_unit);
-                (State { data: board }, desert_hit)
+                (
+                    State {
+                        data: board,
+                        finished: false,
+                    },
+                    desert_hit,
+                )
             }
         }
     }
@@ -205,6 +283,10 @@ impl State {
         }
     }
 
+    /// Apply moves in order, accumulating desert hit counts per space.
+    ///
+    /// The race stops immediately once a camel unit crosses the finish line,
+    /// so any remaining moves in `moves` are ignored.
     pub fn move_multiple_units<I>(&self, moves: I) -> (Self, BTreeMap<u8, usize>)
     where
         I: IntoIterator<Item = (Camel, u8)>,
@@ -212,6 +294,9 @@ impl State {
         let mut state = self.clone();
         let mut counts: BTreeMap<u8, usize> = BTreeMap::new();
         for (camel, steps) in moves.into_iter() {
+            if state.is_finished() {
+                break;
+            }
             let (new_state, maybe_desert) = state.move_unit(camel, steps);
             if let Some(k) = maybe_desert {
                 *counts.entry(k).or_insert(0) += 1usize;
@@ -236,7 +321,8 @@ impl State {
     /// invalid.
     ///
     /// Returns a tuple of:
-    /// - map from Camel -> counts per position (Vec indexed by final position)
+    /// - map from Camel -> counts per finishing position. Index 0 is **1st
+    ///   place** and index 4 is last, matching [`State::ranking`].
     /// - map from space key (u8) -> total desert hit counts across all simulations
     ///
     /// When `already_moved` is non-empty, the desert counts cover only the hits
@@ -323,8 +409,8 @@ impl State {
                 // Avoid allocating a Vec for each permutation+combination by passing the
                 // zipped iterator directly. `move_multiple_units` accepts any IntoIterator.
                 let (result, counts_map) = self.move_multiple_units(perm.iter().cloned().zip(comb));
-                let order = result.order();
-                for (pos, &camel) in order.iter().enumerate() {
+                let ranking = result.ranking();
+                for (pos, &camel) in ranking.iter().enumerate() {
                     if let Some(v) = counts.get_mut(&camel) {
                         v[pos] += 1;
                     }
@@ -339,8 +425,10 @@ impl State {
         (counts, desert_counts)
     }
 
-    /// Return all camels flattened in order by the map's key.
-    /// This mirrors: [c for _, y in sorted(self.data.items(), key=lambda s: s[0]) for c in y][::1]
+    /// Return all camels flattened by board position (rear to front), then by
+    /// height within each stack (bottom to top).
+    ///
+    /// This mirrors: [c for _, y in sorted(self.data.items(), key=lambda s: s[0]) for c in y]
     pub fn order(&self) -> Vec<Camel> {
         self.data
             .values()
@@ -349,6 +437,16 @@ impl State {
                 Space::Desert(_) => Vec::new(),
             })
             .collect()
+    }
+
+    /// Return the camels in race order: index 0 is 1st place, the last index is
+    /// the overall/leg loser.
+    ///
+    /// Ranking is by board position, then by height in the stack: the top camel
+    /// of the most advanced stack is 1st, the camel directly below it is 2nd,
+    /// and so on (RULES.md section 2).
+    pub fn ranking(&self) -> Vec<Camel> {
+        self.order().into_iter().rev().collect()
     }
 
     /// Evaluate desert placements: for each position and desert tile type, compute how many
@@ -373,6 +471,10 @@ impl State {
         let bound = MAX_FIELD;
 
         for pos in min_key..=bound {
+            // A desert tile may never be placed on space 1 (RULES.md section 6).
+            if pos == 1 {
+                continue;
+            }
             for &tile in &[DesertTile::Oasis, DesertTile::Mirage] {
                 // feasibility: cannot place on camels or on an existing desert
                 match self.data.get(&pos) {

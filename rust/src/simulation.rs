@@ -8,9 +8,6 @@
 
 use crate::{Camel, Space, State};
 
-/// Highest numbered space on the race track. Crossing this line ends the race.
-const MAX_FIELD: u8 = 16;
-
 /// Colour order used for the ten returned shares.
 pub const CAMEL_ORDER: [Camel; 5] = [
     Camel::White,
@@ -75,17 +72,19 @@ fn camel_index(camel: Camel) -> usize {
 
 /// Whether a camel unit has crossed the finish line (space 16).
 fn is_finished(state: &State) -> bool {
-    state.data.keys().any(|&key| key > MAX_FIELD)
+    state.is_finished()
 }
 
 /// Return the winner (top of the leading stack) and loser (bottom of the
 /// rearmost stack) of an already finished state. See RULES.md section 2.
 fn finished_camels(state: &State) -> (Camel, Camel) {
-    let ranking = state.order(); // least advanced -> most advanced
+    let ranking = state.ranking(); // 1st place -> last place
     let winner = *ranking
+        .first()
+        .expect("a finished state must contain at least one camel");
+    let loser = *ranking
         .last()
         .expect("a finished state must contain at least one camel");
-    let loser = ranking[0];
     (winner, loser)
 }
 
@@ -154,8 +153,8 @@ fn run_scenario(state: &State, rng: &mut SimRng, already_moved: &[Camel]) -> (Ca
         let (next, _) = current.move_unit(camel, steps);
         current = next;
 
-        // move_unit itself does not enforce the finish line (ROADMAP B-01), so
-        // detect the crossing here, including an oasis pushing past space 16.
+        // move_unit ends the race on a crossing, including an oasis on space 16
+        // pushing past the line. Stop the scenario at that point.
         if is_finished(&current) {
             return finished_camels(&current);
         }

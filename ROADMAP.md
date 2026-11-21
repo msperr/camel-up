@@ -22,8 +22,13 @@ At a glance
 -----------
 | Type | Wrong behaviour | Latent | Missing feature | Cosmetic | Total |
 |---|---:|---:|---:|---:|---:|
-| Bug | 3 | 1 | 0 | 1 | 5 |
+| Bug | 1 | 0 | 0 | 0 | 1 |
 | Feature | 0 | 0 | 8 | 0 | 8 |
+
+Resolved since the verification: **B-01, B-02, B-04, B-05**. B-03 is retained
+by design: a desert behind the rearmost camel can never be reached (camel
+positions never decrease across a move), so excluding those spaces loses no
+coin-relevant outcomes.
 
 Priority: **P0** blocks the repository purpose (evaluating actions by expected
 coins); **P1** is required for a usable evaluator; **P2** is completeness or
@@ -49,6 +54,9 @@ Bugs
 - **Next step:** Detect the crossing, stop the movement, and expose a
   race-finished state; use the same boundary in movement and evaluation; add
   tests for exact finish and overshoot.
+- **Status:** Resolved on `fix/rust-core-bugs`. `MAX_FIELD` is now shared with
+  the Monte Carlo module, `move_unit` clamps a crossing unit onto space 16 and
+  sets `State::is_finished()`, and `move_multiple_units` stops at the finish.
 
 ### B-02 — Ranking index is reversed in simulation — P0
 
@@ -67,6 +75,9 @@ Bugs
   (reverse of `order()`), use it in `simulate_outcomes`, document the index
   convention, and test multi-camel stacks where 1st and 2nd are in the same
   stack.
+- **Status:** Resolved on `fix/rust-core-bugs`. `State::ranking()` returns 1st
+  through last, `simulate_outcomes` uses it (index 0 is 1st), and the convention
+  is documented and tested.
 
 ### B-03 — Desert candidate list misses legal spaces — P2
 
@@ -84,6 +95,10 @@ Bugs
 - **Next step:** Iterate the full legal track range (for example 2..=16)
   independently of `min_key`; add a test with a state whose rearmost camel is
   ahead of unused spaces.
+- **Status:** Retained by design. A camel's position never decreases across a
+  move (dice and oasis move forward; a mirage moves back one from a space the
+  unit just reached by moving forward), so a desert strictly behind the
+  rearmost camel cannot be triggered. No coin-relevant outcomes are lost.
 
 ### B-04 — Space 1 is not explicitly excluded — P3
 
@@ -99,6 +114,8 @@ Bugs
 - **Impact:** Only malformed/internal states are affected.
 - **Next step:** Add the explicit `pos != 1` check and a regression test. The
   proposed B-03 range (`2..=16`) would also avoid this.
+- **Status:** Resolved on `fix/rust-core-bugs` with an explicit `pos == 1`
+  guard and a regression test using a malformed key below 1.
 
 ### B-05 — Stale panic message — P3
 
@@ -108,6 +125,9 @@ Bugs
 - **Finding:** The panic message refers to `tally_outcomes`, an old API name.
 - **Impact:** Diagnostics only.
 - **Next step:** Rename the message to `simulate_outcomes`.
+- **Status:** Already resolved in the code at verification time (the roadmap
+  entry was stale): all panic messages in `simulate_outcomes` use the current
+  name, and no `tally_outcomes` text remains outside this document.
 
 Features
 --------
@@ -206,6 +226,9 @@ Features
 
 Suggested order
 ---------------
+Steps 1 and 6 are complete on branch `fix/rust-core-bugs`; B-03 is deliberately
+out of scope (see its status above).
+
 1. **Fix B-01 and B-02** — the current results can be wrong even for the
    implemented movement-only subset.
 2. **Build F-01** — the shared player/leg/action state is the foundation for all
