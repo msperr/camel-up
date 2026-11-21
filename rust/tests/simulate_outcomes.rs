@@ -204,3 +204,23 @@ fn outcome_vectors_are_indexed_by_finishing_position() {
     assert_eq!(counts[&Camel::Yellow][3], 3);
     assert_eq!(counts[&Camel::White][4], 3);
 }
+
+#[test]
+#[should_panic(expected = "race has already finished")]
+fn simulating_a_finished_race_panics() {
+    let mut map = BTreeMap::new();
+    map.insert(
+        16,
+        Space::Camels(vec![
+            Camel::White,
+            Camel::Yellow,
+            Camel::Orange,
+            Camel::Green,
+            Camel::Blue,
+        ]),
+    );
+    let state = State::new(map);
+    let (finished, _) = state.move_unit(Camel::White, 1);
+
+    finished.simulate_outcomes(&[]);
+}

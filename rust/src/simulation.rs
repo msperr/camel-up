@@ -70,11 +70,6 @@ fn camel_index(camel: Camel) -> usize {
         .expect("camel must be one of the five racing camels")
 }
 
-/// Whether a camel unit has crossed the finish line (space 16).
-fn is_finished(state: &State) -> bool {
-    state.is_finished()
-}
-
 /// Return the winner (top of the leading stack) and loser (bottom of the
 /// rearmost stack) of an already finished state. See RULES.md section 2.
 fn finished_camels(state: &State) -> (Camel, Camel) {
@@ -155,7 +150,7 @@ fn run_scenario(state: &State, rng: &mut SimRng, already_moved: &[Camel]) -> (Ca
 
         // move_unit ends the race on a crossing, including an oasis on space 16
         // pushing past the line. Stop the scenario at that point.
-        if is_finished(&current) {
+        if current.is_finished() {
             return finished_camels(&current);
         }
     }
@@ -175,7 +170,7 @@ pub fn simulate_overall_winner_loser_with(
 ) -> OverallOdds {
     validate(state, already_moved, iterations);
 
-    if is_finished(state) {
+    if state.is_finished() {
         let (winner, loser) = finished_camels(state);
         let mut result = [0.0f64; 10];
         result[camel_index(winner)] = 1.0;

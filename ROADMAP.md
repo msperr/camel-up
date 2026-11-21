@@ -30,6 +30,9 @@ by design: a desert behind the rearmost camel can never be reached (camel
 positions never decrease across a move), so excluding those spaces loses no
 coin-relevant outcomes.
 
+API note: `State` now has an internal `finished` field. Construct states with
+`State::new(data)`; a `State { data }` struct literal no longer compiles.
+
 Priority: **P0** blocks the repository purpose (evaluating actions by expected
 coins); **P1** is required for a usable evaluator; **P2** is completeness or
 robustness; **P3** is cleanup.
@@ -54,9 +57,11 @@ Bugs
 - **Next step:** Detect the crossing, stop the movement, and expose a
   race-finished state; use the same boundary in movement and evaluation; add
   tests for exact finish and overshoot.
-- **Status:** Resolved on `fix/rust-core-bugs`. `MAX_FIELD` is now shared with
-  the Monte Carlo module, `move_unit` clamps a crossing unit onto space 16 and
-  sets `State::is_finished()`, and `move_multiple_units` stops at the finish.
+- **Status:** Resolved on `fix/rust-core-bugs`. `MAX_FIELD` is now a single
+  public constant used for movement and evaluation; the Monte Carlo module
+  delegates to `State::is_finished()`. `move_unit` clamps a crossing unit onto
+  space 16, sets the internal `finished` flag (queryable via
+  `State::is_finished()`), and `move_multiple_units` stops at the finish.
 
 ### B-02 — Ranking index is reversed in simulation — P0
 
@@ -226,8 +231,9 @@ Features
 
 Suggested order
 ---------------
-Steps 1 and 6 are complete on branch `fix/rust-core-bugs`; B-03 is deliberately
-out of scope (see its status above).
+Steps 1 and 2 (B-04) are complete on branch `fix/rust-core-bugs`. B-03 is
+deliberately out of scope (see its status above). B-05 was already fixed in the
+code before verification; only its stale roadmap entry was corrected.
 
 1. **Fix B-01 and B-02** — the current results can be wrong even for the
    implemented movement-only subset.
@@ -237,5 +243,6 @@ out of scope (see its status above).
    payouts.
 4. **Add F-07** — make the evaluator valid for the final leg and mid-leg
    decisions.
-5. **Finish B-03, B-04, F-06, F-08** — completeness and robustness.
+5. **Finish F-06, F-08** — completeness and robustness (B-03 is intentionally
+   excluded; B-04 is resolved).
 6. **Clean up B-05** — cosmetic.

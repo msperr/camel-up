@@ -399,3 +399,71 @@ fn moving_in_a_finished_state_panics() {
 
     finished.move_unit(Camel::White, 1);
 }
+
+#[test]
+fn oasis_on_16_carries_the_whole_stack_over_the_finish() {
+    use camel_up::{DesertTile, Space};
+
+    let mut map = mk_map(&[
+        (14, vec![Camel::White, Camel::Yellow]),
+        (10, vec![Camel::Blue]),
+    ]);
+    map.insert(16, Space::Desert(DesertTile::Oasis));
+    let state = State::new(map);
+
+    let (res, desert_hit) = state.move_unit(Camel::White, 2);
+
+    assert_eq!(desert_hit, Some(16));
+    assert_eq!(
+        res.data.get(&16),
+        Some(&Space::Camels(vec![Camel::White, Camel::Yellow]))
+    );
+    assert!(res.is_finished());
+    // Yellow stays on top of the carried unit, so it is 1st at the finish.
+    assert_eq!(
+        res.ranking(),
+        vec![Camel::Yellow, Camel::White, Camel::Blue]
+    );
+}
+
+#[test]
+fn mirage_on_16_is_not_triggered_by_a_dice_overshoot() {
+    use camel_up::{DesertTile, Space};
+
+    let mut map = mk_map(&[(15, vec![Camel::White])]);
+    map.insert(16, Space::Desert(DesertTile::Mirage));
+    let state = State::new(map);
+
+    let (res, desert_hit) = state.move_unit(Camel::White, 3);
+
+    assert_eq!(desert_hit, None);
+    assert_eq!(res.data.get(&16), Some(&Space::Camels(vec![Camel::White])));
+    assert!(!res
+        .data
+        .values()
+        .any(|space| matches!(space, Space::Desert(_))));
+    assert!(res.is_finished());
+}
+
+#[test]
+fn finished_state_has_no_desert_placements_to_evaluate() {
+    let state = State::new(mk_map(&[(16, vec![Camel::White])]));
+    let (finished, _) = state.move_unit(Camel::White, 1);
+
+    assert!(finished.is_finished());
+    assert!(finished.evaluate_desert_placements().is_empty());
+}
+
+#[test]
+fn a_space_beyond_16_already_marks_the_state_finished() {
+    use camel_up::{DesertTile, Space};
+
+    // The shared adjacency helper also covers the defensive check in the
+    // crossing branch; a desert at 17 is itself treated as a finished board.
+    let mut map = mk_map(&[(14, vec![Camel::White])]);
+    map.insert(16, Space::Desert(DesertTile::Oasis));
+    map.insert(17, Space::Desert(DesertTile::Mirage));
+    let state = State::new(map);
+
+    assert!(state.is_finished());
+}
