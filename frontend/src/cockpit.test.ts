@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createRaceState, type RaceState } from "./camelRace";
 import {
   buildCockpitRequest,
+  buildCockpitRequestWithDeserts,
   fetchCockpitEvaluation,
   type CockpitResponse,
   type ThrownDie,
 } from "./cockpit";
+import type { PlacedDesert } from "./desertTiles";
 import { createLegBetState } from "./legBets";
 
 const dice: readonly ThrownDie[] = [
@@ -63,6 +65,21 @@ describe("buildCockpitRequest", () => {
       true,
     );
   });
+
+  it("includes placed desert tiles without their local badge", () => {
+    const deserts: PlacedDesert[] = [
+      { space: 8, kind: "oasis", badge: "amber" },
+      { space: 11, kind: "mirage", badge: "teal" },
+    ];
+
+    expect(
+      buildCockpitRequestWithDeserts(dice, createRaceState(), createLegBetState(), false, deserts)
+        .deserts,
+    ).toEqual([
+      { space: 8, kind: "oasis" },
+      { space: 11, kind: "mirage" },
+    ]);
+  });
 });
 
 describe("fetchCockpitEvaluation", () => {
@@ -83,6 +100,29 @@ describe("fetchCockpitEvaluation", () => {
         body: JSON.stringify(request),
       }),
     );
+  });
+
+  it("returns the backend's desert recommendations", async () => {
+    const body: CockpitResponse = {
+      ...responseBody,
+      desert: {
+        options: [
+          { kind: "mirage", space: 10, expectedCoins: 1.25 },
+          { kind: "oasis", space: 4, expectedCoins: 0.75 },
+        ],
+      },
+    };
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => body,
+    } as Response);
+
+    await expect(
+      fetchCockpitEvaluation(
+        buildCockpitRequest([], createRaceState(), createLegBetState(), false),
+      ),
+    ).resolves.toEqual(body);
   });
 
   it("passes the abort signal through", async () => {

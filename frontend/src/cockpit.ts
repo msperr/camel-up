@@ -7,6 +7,7 @@
  */
 
 import { CAMEL_COLORS, type CamelColor, type DieValue, type RaceState } from "./camelRace";
+import type { DesertKind, DesertPlacement } from "./desertTiles";
 import { getLegBetValues, type LegBetState } from "./legBets";
 
 const COCKPIT_PATH = "/api/cockpit/actions";
@@ -26,6 +27,8 @@ export type CockpitRequest = {
   readonly availableLegBets: Readonly<Record<CamelColor, number | null>>;
   /** Setup dice only place the camels; leg bets are not available yet. */
   readonly setupRound: boolean;
+  /** Desert tiles already on the board; omitted by the no-tiles builder. */
+  readonly deserts?: readonly DesertPlacement[];
 };
 
 export type CamelOdds = {
@@ -36,8 +39,16 @@ export type CamelOdds = {
   readonly roundWinProbability: number | null;
 };
 
+export type DesertOption = {
+  readonly kind: DesertKind;
+  readonly space: number;
+  readonly expectedCoins: number;
+};
+
 export type CockpitResponse = {
   readonly dice: { readonly expectedCoins: number | null };
+  /** Recommendations for the desert action; absent on older backends. */
+  readonly desert?: { readonly options: readonly DesertOption[] };
   readonly legBet: {
     readonly available: boolean;
     readonly camels: readonly CamelOdds[];
@@ -69,6 +80,21 @@ export const buildCockpitRequest = (
     setupRound,
   };
 };
+
+/**
+ * Turn the current board snapshot into the API request including desert tiles.
+ * Only the space and face are sent; badges are purely local presentation.
+ */
+export const buildCockpitRequestWithDeserts = (
+  dice: readonly ThrownDie[],
+  race: RaceState,
+  legBets: LegBetState,
+  setupRound: boolean,
+  deserts: readonly DesertPlacement[],
+): CockpitRequest => ({
+  ...buildCockpitRequest(dice, race, legBets, setupRound),
+  deserts: deserts.map(({ space, kind }) => ({ space, kind })),
+});
 
 /** Read the backend's validation message from a non-2xx response, if present. */
 const rejectionDetail = async (response: Response): Promise<string> => {
