@@ -38,6 +38,8 @@ import {
   createPlacedDesert,
   DESERT_ART,
   DESERT_ART_VIEWBOX,
+  DESERT_PLUS_ARM,
+  DESERT_PLUS_INSET,
   getDesertArtTransform,
   getDesertTilePlacement,
   isLegalDesertPlacement,
@@ -247,15 +249,10 @@ function DesertTile({
   readonly desert: PlacedDesert;
   readonly placement: DesertTilePlacement;
 }) {
-  const scale = DESERT_ART_VIEWBOX / placement.size;
-  const badgeX = (placement.badge.x - (placement.x - placement.size / 2)) * scale;
-  const badgeY = (placement.badge.y - (placement.y - placement.size / 2)) * scale;
-
   return (
     <g
       data-desert={desert.kind}
       data-desert-space={desert.space}
-      data-desert-badge={desert.badge}
       transform={getDesertArtTransform(placement)}
       filter="url(#tile-shadow)"
     >
@@ -267,12 +264,6 @@ function DesertTile({
       />
       <rect x="6" y="6" width="88" height="88" rx="7" className="desert-tile-inner" />
       <DesertArtwork kind={desert.kind} />
-      <circle
-        cx={badgeX}
-        cy={badgeY}
-        r={placement.badge.radius * scale}
-        className={`desert-badge desert-badge--${desert.badge}`}
-      />
     </g>
   );
 }
@@ -468,7 +459,7 @@ export default function App() {
       return;
     }
 
-    const placed = [...deserts, createPlacedDesert(space, kind, deserts)];
+    const placed = [...deserts, createPlacedDesert(space, kind)];
     const nextSpace = [
       ...legalDesertSpaces.filter((candidate) => candidate > space),
       ...legalDesertSpaces.filter((candidate) => candidate < space),
@@ -848,8 +839,7 @@ export default function App() {
                   the fields, stacked tightly when they share one. A camel that passes the finish
                   line is drawn just above it, outside the track. The light central three by three
                   panel contains a centred three by one tray for five coloured dice and an add-die
-                  button. Flat desert tiles with a small coloured badge may lie on empty fields,
-                  underneath any passing camels.
+                  button. Flat desert tiles may lie on empty fields, underneath any passing camels.
                 </desc>
 
                 <defs>
@@ -1072,11 +1062,15 @@ export default function App() {
                             className="desert-field-hit"
                           />
                           <g
-                            transform={`translate(${space.x} ${space.y})`}
+                            transform={`translate(${space.x + space.width / 2 - DESERT_PLUS_INSET} ${
+                              space.y - space.height / 2 + DESERT_PLUS_INSET
+                            })`}
                             className="desert-add-icon"
+                            aria-hidden="true"
                           >
-                            <circle r="24" />
-                            <path d="M -10 0 H 10 M 0 -10 V 10" />
+                            <path
+                              d={`M ${-DESERT_PLUS_ARM} 0 H ${DESERT_PLUS_ARM} M 0 ${-DESERT_PLUS_ARM} V ${DESERT_PLUS_ARM}`}
+                            />
                           </g>
                         </>
                       )}

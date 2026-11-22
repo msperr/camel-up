@@ -122,24 +122,21 @@ body {
   fill: rgba(0, 0, 0, 0);
 }
 
-.desert-add-icon circle {
-  fill: #fdf2dc;
-  stroke: #2f6f68;
-  stroke-width: 4;
-  transition: fill 120ms ease;
-}
-
 .desert-add-icon path {
   fill: none;
-  stroke: #2f6f68;
-  stroke-width: 5;
+  stroke: #4e8a84;
+  stroke-width: 3;
   stroke-linecap: round;
+  opacity: 0.7;
+  transition:
+    opacity 120ms ease,
+    stroke-width 120ms ease;
 }
 
-.desert-field--legal:hover .desert-add-icon circle,
-.desert-field--legal:focus-visible .desert-add-icon circle {
-  fill: #d7f0ea;
-  stroke-width: 6;
+.desert-field--legal:hover .desert-add-icon path,
+.desert-field--legal:focus-visible .desert-add-icon path {
+  opacity: 1;
+  stroke-width: 4;
 }
 
 .space-tile {
@@ -316,43 +313,6 @@ body {
   stroke-linecap: round;
 }
 
-.desert-badge {
-  stroke: #3d2a1a;
-  stroke-width: 2;
-}
-
-.desert-badge--amber {
-  fill: #e8a020;
-}
-
-.desert-badge--teal {
-  fill: #2f8f86;
-}
-
-.desert-badge--violet {
-  fill: #8257a8;
-}
-
-.desert-badge--rose {
-  fill: #cc5f83;
-}
-
-.desert-badge--sky {
-  fill: #4e90c7;
-}
-
-.desert-badge--lime {
-  fill: #83ad3f;
-}
-
-.desert-badge--coral {
-  fill: #d96b42;
-}
-
-.desert-badge--indigo {
-  fill: #4a54a0;
-}
-
 .cockpit {
   display: grid;
   width: var(--board-size);
@@ -492,10 +452,9 @@ body {
 
 .cockpit-desert {
   display: grid;
-  grid-template-columns: auto auto;
-  grid-template-rows: auto auto;
+  grid-template-columns: auto auto 1fr;
   align-items: center;
-  gap: 1px 5px;
+  gap: 4px;
   padding: 2px 5px;
   background: rgba(255, 255, 255, 0.5);
   border: 1px solid #d9bd91;
@@ -522,7 +481,6 @@ body {
 }
 
 .cockpit-desert .cockpit-coins {
-  grid-column: 1 / -1;
   font-size: 11px;
   text-align: right;
 }
@@ -531,10 +489,6 @@ body {
   .cockpit-row {
     grid-template-columns: 1fr;
     gap: 4px;
-  }
-
-  .cockpit-deserts {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .cockpit-value,

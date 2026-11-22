@@ -179,7 +179,15 @@ describe("Cockpit", () => {
         "0.40",
         "0.20",
       ]);
-      expect(getRow(container, "desert")).toHaveTextContent("MirageSpace 10");
+      expect(rows.map((row) => row.querySelector(".cockpit-desert-space")?.textContent)).toEqual([
+        "10",
+        "4",
+        "12",
+        "8",
+      ]);
+      expect(getRow(container, "desert")).toHaveTextContent("Mirage10");
+      expect(getRow(container, "desert")).not.toHaveTextContent("Space 10");
+      expect(rows.every((row) => row.children.length === 3)).toBe(true);
     });
 
     it("shows a placeholder when there are no options or an older backend", () => {

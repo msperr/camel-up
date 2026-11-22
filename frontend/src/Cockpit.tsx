@@ -71,10 +71,11 @@ export default function Cockpit({ evaluation, error, diceAvailable = true }: Coc
                 data-desert-option="true"
                 data-desert-kind={kind}
                 data-desert-space={space}
+                aria-label={`${kind} on space ${space}`}
                 key={`${kind}-${space}`}
               >
                 <span className="cockpit-desert-kind">{kind === "oasis" ? "Oasis" : "Mirage"}</span>
-                <span className="cockpit-desert-space">Space {space}</span>
+                <span className="cockpit-desert-space">{space}</span>
                 <span className="cockpit-coins" data-expected-coins>
                   {formatCoins(expectedCoins)}
                 </span>

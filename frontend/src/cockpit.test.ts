@@ -66,10 +66,10 @@ describe("buildCockpitRequest", () => {
     );
   });
 
-  it("includes placed desert tiles without their local badge", () => {
+  it("includes placed desert tiles", () => {
     const deserts: PlacedDesert[] = [
-      { space: 8, kind: "oasis", badge: "amber" },
-      { space: 11, kind: "mirage", badge: "teal" },
+      { space: 8, kind: "oasis" },
+      { space: 11, kind: "mirage" },
     ];
 
     expect(

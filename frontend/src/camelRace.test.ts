@@ -92,11 +92,7 @@ describe("camel race state", () => {
   });
 });
 
-const tile = (space: number, kind: DesertKind): PlacedDesert => ({
-  space,
-  kind,
-  badge: "amber",
-});
+const tile = (space: number, kind: DesertKind): PlacedDesert => ({ space, kind });
 const race = (stacks: RaceState["stacks"]): RaceState => ({ stacks, finished: null });
 
 describe("camel movement with desert tiles", () => {

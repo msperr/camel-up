@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import { BOARD_SPACES } from "./boardLayout";
 
 const getDice = (container: HTMLElement) => [
   ...container.querySelectorAll<SVGGElement>("[data-die]"),
@@ -993,7 +994,24 @@ describe("App", () => {
       expect(getDesertPlaceButtons(container)).toHaveLength(0);
     }, 20000);
 
-    it("places an oasis with a badge, flat behind the camels, and reports it", async () => {
+    it("shows only a small plus at the top right of legal fields", () => {
+      const { container } = render(<App />);
+      completeSetup();
+      const field = getDesertPlaceButtons(container)[0];
+      const space = Number(field.dataset.desertPlaceSpace);
+      const layout = BOARD_SPACES.find((item) => item.space === space);
+      const icon = field.querySelector<SVGGElement>(".desert-add-icon");
+      const translate = icon?.getAttribute("transform")?.match(/translate\(([-\d.]+) ([-\d.]+)\)/);
+
+      expect(layout).toBeDefined();
+      expect(translate).not.toBeNull();
+      expect(Number(translate?.[1])).toBeGreaterThan(layout?.x ?? 0);
+      expect(Number(translate?.[2])).toBeLessThan(layout?.y ?? 0);
+      expect(icon?.querySelector("circle")).not.toBeInTheDocument();
+      expect(icon?.querySelectorAll("path")).toHaveLength(1);
+    });
+
+    it("places a flat oasis without a badge behind the camels and reports it", async () => {
       const { container } = render(<App />);
       completeSetup();
 
@@ -1014,9 +1032,10 @@ describe("App", () => {
         dataset: expect.objectContaining({
           desert: "oasis",
           desertSpace: "5",
-          desertBadge: "amber",
         }),
       });
+      expect(tile.querySelector(".desert-badge")).not.toBeInTheDocument();
+      expect(tile.querySelector("circle")).not.toBeInTheDocument();
       const camels = container.querySelector('[data-camels="true"]');
       expect(tile.compareDocumentPosition(camels as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
         Node.DOCUMENT_POSITION_FOLLOWING,
