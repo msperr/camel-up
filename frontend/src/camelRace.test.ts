@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { applyDie, createRaceState, hasCamels, isRaceFinished } from "./camelRace";
+import {
+  applyDie,
+  applyDieWithDeserts,
+  createRaceState,
+  hasCamels,
+  isRaceFinished,
+  type RaceState,
+} from "./camelRace";
+import type { DesertKind, PlacedDesert } from "./desertTiles";
 
 describe("camel race state", () => {
   it("starts with no camels on the field", () => {
@@ -81,5 +89,79 @@ describe("camel race state", () => {
 
     expect(createRaceState()).toEqual({ stacks: {}, finished: null });
     expect(played.stacks).not.toEqual({});
+  });
+});
+
+const tile = (space: number, kind: DesertKind): PlacedDesert => ({
+  space,
+  kind,
+  badge: "amber",
+});
+const race = (stacks: RaceState["stacks"]): RaceState => ({ stacks, finished: null });
+
+describe("camel movement with desert tiles", () => {
+  it("moves a unit one space forward onto an oasis, landing on top", () => {
+    const state = race({ 1: ["white"], 4: ["green"] });
+    const deserts = [tile(3, "oasis")];
+
+    expect(applyDieWithDeserts(state, "white", 2, deserts).stacks).toEqual({
+      4: ["green", "white"],
+    });
+  });
+
+  it("moves a unit one space backward from a mirage, going underneath", () => {
+    const state = race({ 3: ["blue", "white"], 4: ["green"] });
+    const deserts = [tile(5, "mirage")];
+
+    expect(applyDieWithDeserts(state, "white", 2, deserts).stacks).toEqual({
+      3: ["blue"],
+      4: ["white", "green"],
+    });
+  });
+
+  it("puts a unit from a mirage onto an empty space behind it", () => {
+    const state = race({ 3: ["white"] });
+    const deserts = [tile(5, "mirage")];
+
+    expect(applyDieWithDeserts(state, "white", 2, deserts).stacks).toEqual({ 4: ["white"] });
+  });
+
+  it("finishes when an oasis on space 16 pushes the unit over the line", () => {
+    const state = race({ 15: ["white", "yellow"] });
+    const deserts = [tile(16, "oasis")];
+    const next = applyDieWithDeserts(state, "white", 1, deserts);
+
+    expect(next.stacks).toEqual({});
+    expect(next.finished).toEqual(["white", "yellow"]);
+    expect(isRaceFinished(next)).toBe(true);
+  });
+
+  it("does not chain to a tile on the extra step's space", () => {
+    const state = race({ 1: ["white"] });
+    // These tiles are adjacent, so illegal in play; the point is that the
+    // mirage at 5 must not trigger after the oasis has moved the unit to 5.
+    const deserts = [tile(4, "oasis"), tile(5, "mirage")];
+
+    expect(applyDieWithDeserts(state, "white", 3, deserts).stacks).toEqual({ 5: ["white"] });
+  });
+
+  it("still finishes on a plain dice overshoot", () => {
+    const state = race({ 16: ["white", "yellow"] });
+    const next = applyDieWithDeserts(state, "white", 2, [tile(4, "mirage")]);
+
+    expect(next.stacks).toEqual({});
+    expect(next.finished).toEqual(["white", "yellow"]);
+  });
+
+  it("ignores further dice once the race has finished", () => {
+    const finished = applyDieWithDeserts(race({ 16: ["white"] }), "white", 1, [tile(16, "oasis")]);
+
+    expect(applyDieWithDeserts(finished, "yellow", 1, [])).toBe(finished);
+  });
+
+  it("leaves applyDie as the no-tiles wrapper", () => {
+    const state = race({ 1: ["white"], 4: ["green"] });
+
+    expect(applyDie(state, "white", 2)).toEqual(applyDieWithDeserts(state, "white", 2, []));
   });
 });
