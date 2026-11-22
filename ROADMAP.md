@@ -203,6 +203,9 @@ Features
   coin basis with the other actions.
 - **Next step:** Add owner/EP accounting and evaluate the tile's effect on the
   full expected payout, not only on hit frequency.
+- **Status:** Direct-income evaluation and UI placement are specified in
+  [docs/plans/desert-oasis-fields.md](docs/plans/desert-oasis-fields.md).
+  Bet interaction remains open.
 
 ### F-06 — Moving an existing desert tile / one-tile constraint — P2
 
