@@ -100,6 +100,48 @@ body {
   overflow: visible;
 }
 
+/* The placement targets sit above the board but outside its role=img SVG. */
+.desert-placement-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.desert-field--legal {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.desert-field:focus {
+  outline: none;
+}
+
+.desert-field-hit {
+  fill: rgba(0, 0, 0, 0);
+}
+
+.desert-add-icon circle {
+  fill: #fdf2dc;
+  stroke: #2f6f68;
+  stroke-width: 4;
+  transition: fill 120ms ease;
+}
+
+.desert-add-icon path {
+  fill: none;
+  stroke: #2f6f68;
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.desert-field--legal:hover .desert-add-icon circle,
+.desert-field--legal:focus-visible .desert-add-icon circle {
+  fill: #d7f0ea;
+  stroke-width: 6;
+}
+
 .space-tile {
   fill: var(--field);
   stroke: var(--grid);
@@ -226,6 +268,89 @@ body {
   font-weight: 800;
   fill: var(--ink);
   font-variant-numeric: tabular-nums;
+}
+
+/* Flat cardboard tiles, drawn underneath camel pieces. */
+.desert-tile-surface {
+  fill: #e8c483;
+  stroke: #5b3520;
+  stroke-width: 5;
+}
+
+.desert-tile-inner {
+  fill: none;
+  stroke: #b8864f;
+  stroke-width: 2;
+}
+
+.desert-oasis-water {
+  fill: #4fa9b8;
+  stroke: #2f6f78;
+  stroke-width: 2;
+}
+
+.desert-oasis-trunk {
+  fill: none;
+  stroke: #7a4b28;
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.desert-oasis-fronds {
+  fill: none;
+  stroke: #3a6d34;
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.desert-mirage-dune {
+  fill: #d99b5b;
+  stroke: #a86d34;
+  stroke-width: 2;
+}
+
+.desert-mirage-haze {
+  fill: none;
+  stroke: #f8ecd0;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.desert-badge {
+  stroke: #3d2a1a;
+  stroke-width: 2;
+}
+
+.desert-badge--amber {
+  fill: #e8a020;
+}
+
+.desert-badge--teal {
+  fill: #2f8f86;
+}
+
+.desert-badge--violet {
+  fill: #8257a8;
+}
+
+.desert-badge--rose {
+  fill: #cc5f83;
+}
+
+.desert-badge--sky {
+  fill: #4e90c7;
+}
+
+.desert-badge--lime {
+  fill: #83ad3f;
+}
+
+.desert-badge--coral {
+  fill: #d96b42;
+}
+
+.desert-badge--indigo {
+  fill: #4a54a0;
 }
 
 .cockpit {
@@ -359,10 +484,57 @@ body {
   color: #6b3f22;
 }
 
+.cockpit-deserts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(3px, 0.7vmin, 8px);
+}
+
+.cockpit-desert {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 1px 5px;
+  padding: 2px 5px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid #d9bd91;
+  border-radius: 8px;
+}
+
+.cockpit-desert-kind {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.cockpit-desert--oasis .cockpit-desert-kind {
+  color: #2f6f78;
+}
+
+.cockpit-desert--mirage .cockpit-desert-kind {
+  color: #a86d34;
+}
+
+.cockpit-desert-space {
+  font-size: 10px;
+  color: #6b3f22;
+  text-align: right;
+}
+
+.cockpit-desert .cockpit-coins {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  text-align: right;
+}
+
 @media (max-width: 620px) {
   .cockpit-row {
     grid-template-columns: 1fr;
     gap: 4px;
+  }
+
+  .cockpit-deserts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .cockpit-value,
@@ -459,6 +631,53 @@ body {
   margin: 0;
   font-size: 1.35rem;
   letter-spacing: 0.02em;
+}
+
+.desert-dialog-hint {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+  color: #6b3f22;
+}
+
+.desert-dialog-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.desert-choice {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 10px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ink);
+  background: #fffaf0;
+  border: 1px solid #c9a26a;
+  border-radius: 12px;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
+}
+
+.desert-choice:hover {
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(91, 53, 32, 0.16);
+  transform: translateY(-1px);
+}
+
+.desert-choice:focus-visible {
+  outline: 3px solid #2f6f68;
+  outline-offset: 2px;
+}
+
+.desert-choice-art {
+  width: 64px;
+  height: 64px;
 }
 
 .dice-dialog-field {
