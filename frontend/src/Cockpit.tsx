@@ -1,3 +1,4 @@
+import DesertArtwork from "./DesertArtwork";
 import { CAMEL_COLORS } from "./camelRace";
 import type { CamelOdds, CockpitResponse, DesertOption } from "./cockpit";
 
@@ -74,7 +75,10 @@ export default function Cockpit({ evaluation, error, diceAvailable = true }: Coc
                 aria-label={`${kind} on space ${space}`}
                 key={`${kind}-${space}`}
               >
-                <span className="cockpit-desert-kind">{kind === "oasis" ? "Oasis" : "Mirage"}</span>
+                <svg className="cockpit-desert-icon" viewBox="0 0 100 100" aria-hidden="true">
+                  <rect width="100" height="100" rx="10" className="desert-tile-surface" />
+                  <DesertArtwork kind={kind} />
+                </svg>
                 <span className="cockpit-desert-space">{space}</span>
                 <span className="cockpit-coins" data-expected-coins>
                   {formatCoins(expectedCoins)}

@@ -36,7 +36,6 @@ import {
 } from "./camelRace";
 import {
   createPlacedDesert,
-  DESERT_ART,
   DESERT_ART_VIEWBOX,
   DESERT_PLUS_ARM,
   DESERT_PLUS_INSET,
@@ -55,6 +54,7 @@ import {
   type LegBetState,
   type LegBetValue,
 } from "./legBets";
+import DesertArtwork from "./DesertArtwork";
 import Cockpit from "./Cockpit";
 import {
   buildCockpitRequestWithDeserts,
@@ -221,22 +221,6 @@ function CamelPiece({ color, x, y, space, stackIndex, finished = false }: CamelP
       filter="url(#camel-shadow)"
     >
       <CamelSilhouette color={style.color} edge={style.edge} />
-    </g>
-  );
-}
-
-/** The stylised oasis/mirage faces, shared by placed tiles and dialog previews. */
-function DesertArtwork({ kind }: { readonly kind: DesertKind }) {
-  return kind === "oasis" ? (
-    <g>
-      <path d={DESERT_ART.oasis.water} className="desert-oasis-water" />
-      <path d={DESERT_ART.oasis.trunk} className="desert-oasis-trunk" />
-      <path d={DESERT_ART.oasis.fronds} className="desert-oasis-fronds" />
-    </g>
-  ) : (
-    <g>
-      <path d={DESERT_ART.mirage.dune} className="desert-mirage-dune" />
-      <path d={DESERT_ART.mirage.haze} className="desert-mirage-haze" />
     </g>
   );
 }

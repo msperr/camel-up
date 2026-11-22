@@ -461,17 +461,9 @@ body {
   border-radius: 8px;
 }
 
-.cockpit-desert-kind {
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.cockpit-desert--oasis .cockpit-desert-kind {
-  color: #2f6f78;
-}
-
-.cockpit-desert--mirage .cockpit-desert-kind {
-  color: #a86d34;
+.cockpit-desert-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .cockpit-desert-space {

@@ -185,9 +185,25 @@ describe("Cockpit", () => {
         "12",
         "8",
       ]);
-      expect(getRow(container, "desert")).toHaveTextContent("Mirage10");
       expect(getRow(container, "desert")).not.toHaveTextContent("Space 10");
       expect(rows.every((row) => row.children.length === 3)).toBe(true);
+    });
+
+    it("shows the tile artwork as an icon instead of the face name", () => {
+      const { container } = render(<Cockpit evaluation={withOptions} error={null} />);
+      const rows = [...container.querySelectorAll<HTMLElement>("[data-desert-option]")];
+      const mirageIcon = rows[0].querySelector<SVGSVGElement>(".cockpit-desert-icon");
+      const oasisIcon = rows[1].querySelector<SVGSVGElement>(".cockpit-desert-icon");
+
+      expect(mirageIcon).not.toBeNull();
+      expect(mirageIcon?.querySelector(".desert-tile-surface")).toBeInTheDocument();
+      expect(mirageIcon?.querySelector(".desert-mirage-dune")).toBeInTheDocument();
+      expect(mirageIcon?.querySelector(".desert-oasis-water")).not.toBeInTheDocument();
+      expect(oasisIcon?.querySelector(".desert-oasis-water")).toBeInTheDocument();
+      expect(oasisIcon?.querySelector(".desert-mirage-dune")).not.toBeInTheDocument();
+      expect(rows[0]).toHaveAttribute("aria-label", "mirage on space 10");
+      expect(getRow(container, "desert")).not.toHaveTextContent("Mirage");
+      expect(getRow(container, "desert")).not.toHaveTextContent("Oasis");
     });
 
     it("shows a placeholder when there are no options or an older backend", () => {
