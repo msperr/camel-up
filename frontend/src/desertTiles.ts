@@ -18,32 +18,14 @@ export type DesertKind = "oasis" | "mirage";
 
 export const DESERT_KINDS: readonly DesertKind[] = ["oasis", "mirage"];
 
-/**
- * Badges distinguish tiles placed at the same time. There are eight colours so
- * every non-adjacent set of tiles on spaces 2..16 can have a distinct badge.
- */
-export const DESERT_BADGES = [
-  "amber",
-  "teal",
-  "violet",
-  "rose",
-  "sky",
-  "lime",
-  "coral",
-  "indigo",
-] as const;
-export type DesertBadge = (typeof DESERT_BADGES)[number];
-
 /** The part of a tile that is part of the API snapshot. */
 export type DesertPlacement = {
   readonly space: number;
   readonly kind: DesertKind;
 };
 
-/** A tile on the local board, with the badge used to tell tiles apart. */
-export type PlacedDesert = DesertPlacement & {
-  readonly badge: DesertBadge;
-};
+/** A tile on the local board; its face and position distinguish it. */
+export type PlacedDesert = DesertPlacement;
 
 /** Find the tile on a space, if any. */
 export const desertAt = (
@@ -110,55 +92,37 @@ export const getLegalDesertPlacements = (
   );
 };
 
-/** The first badge not yet in use, cycling deterministically if all are used. */
-export const nextDesertBadge = (existing: readonly PlacedDesert[]): DesertBadge => {
-  const used = new Set(existing.map((desert) => desert.badge));
-  const free = DESERT_BADGES.find((badge) => !used.has(badge));
-
-  return free ?? DESERT_BADGES[existing.length % DESERT_BADGES.length];
-};
-
-/** Add a tile to the local board with a badge that distinguishes it. */
-export const createPlacedDesert = (
-  space: number,
-  kind: DesertKind,
-  existing: readonly PlacedDesert[],
-): PlacedDesert => ({ space, kind, badge: nextDesertBadge(existing) });
+/** Add a tile to the local board. */
+export const createPlacedDesert = (space: number, kind: DesertKind): PlacedDesert => ({
+  space,
+  kind,
+});
 
 /** Tiles are drawn inside their 200px field with a small margin. */
 export const DESERT_TILE_SIZE = SPACE_WIDTH * 0.72;
-export const DESERT_BADGE_INSET = 14;
-export const DESERT_BADGE_RADIUS = 11;
+
+/** The clickable-field plus sits near the top-right corner of the field. */
+export const DESERT_PLUS_INSET = 20;
+export const DESERT_PLUS_ARM = 8;
 
 export type DesertTilePlacement = {
   /** Centre of the tile in board viewBox coordinates. */
   readonly x: number;
   readonly y: number;
   readonly size: number;
-  readonly badge: {
-    readonly x: number;
-    readonly y: number;
-    readonly radius: number;
-  };
 };
 
-/** Where to draw a tile and its badge; `null` for a non-track space. */
+/** Where to draw a tile; `null` for a non-track space. */
 export const getDesertTilePlacement = (space: number): DesertTilePlacement | null => {
   const field = BOARD_SPACES.find((item) => item.space === space);
   if (!field) {
     return null;
   }
 
-  const half = DESERT_TILE_SIZE / 2;
   return {
     x: field.x,
     y: field.y,
     size: DESERT_TILE_SIZE,
-    badge: {
-      x: field.x + half - DESERT_BADGE_INSET,
-      y: field.y - half + DESERT_BADGE_INSET,
-      radius: DESERT_BADGE_RADIUS,
-    },
   };
 };
 

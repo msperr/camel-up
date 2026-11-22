@@ -23,7 +23,7 @@ At a glance
 | Type | Wrong behaviour | Latent | Missing feature | Cosmetic | Total |
 |---|---:|---:|---:|---:|---:|
 | Bug | 0 | 0 | 0 | 0 | 0 |
-| Feature | 0 | 0 | 7 | 0 | 7 |
+| Feature | 0 | 0 | 8 | 0 | 8 |
 | Cosmetic | 0 | 0 | 0 | 2 | 2 |
 
 Resolved since the verification: **B-01, B-02, B-04, F-07, F-09**. B-05 was already
@@ -298,6 +298,24 @@ Features
   an action the new snapshot reports as unavailable. Implementation is out of
   scope for the setup-round work.
 
+### F-12 — Cockpit suggests desert fields that can never pay — P2
+
+- **Type:** Feature
+- **Classification:** Missing feature
+- **Where:** `desert_options` in `rust/src/cockpit.rs`
+- **Finding:** Every legal `(space, face)` becomes a `DesertOption`, including
+  placements with `expectedCoins == 0` — no remaining die order and value
+  combination lands a camel on that field. The cockpit shows up to four options
+  as recommendations, so a field with no possible hit can be suggested.
+- **Impact:** Misleading recommendations: a zero-probability field looks like a
+  merely poor one. No rules result or expected coin value is wrong.
+- **Next step:** Drop candidates with `expectedCoins <= 0` in the Rust evaluator
+  before sorting, and add a regression test in `rust/tests/cockpit.rs`. This is
+  **backend** work: `expectedCoins` is the backend's hit probability and the
+  frontend contains no rules logic — it only renders the options it receives.
+  Do not filter in the frontend.
+- **Status:** Recorded on `feat/desert-ui`; deliberately not implemented there.
+
 Suggested order
 ---------------
 B-01, B-02, B-04 and B-05 are complete on branch `fix/rust-core-bugs`. B-03 is
@@ -322,3 +340,5 @@ the race-finish work.
    UI is revisited.~~ F-09 is complete; F-10 remains open.
 8. **Handle F-11** — remove the cockpit flicker during reevaluation once the
    board/cockpit UI is revisited.
+9. **Handle F-12** — filter zero-probability desert options in the Rust
+   evaluator (backend only; no frontend change).

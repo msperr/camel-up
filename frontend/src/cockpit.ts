@@ -83,7 +83,7 @@ export const buildCockpitRequest = (
 
 /**
  * Turn the current board snapshot into the API request including desert tiles.
- * Only the space and face are sent; badges are purely local presentation.
+ * Only each tile's space and face are sent to the backend.
  */
 export const buildCockpitRequestWithDeserts = (
   dice: readonly ThrownDie[],

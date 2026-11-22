@@ -82,10 +82,9 @@ describe("Cockpit", () => {
     expect(blue?.querySelector("[data-win-probability]")).toHaveTextContent("31%");
   });
 
-  it("uses dashes for the unimplemented actions", () => {
+  it("uses a dash for the unimplemented overall-bet action", () => {
     const { container } = render(<Cockpit evaluation={evaluation} error={null} />);
 
-    expect(getRow(container, "desert")).toHaveTextContent("—");
     expect(getRow(container, "overall")).toHaveTextContent("—");
   });
 
@@ -152,5 +151,72 @@ describe("Cockpit", () => {
     expect(container.querySelector("[data-cockpit-error]")).toHaveTextContent(error);
     expect(getRow(container, "legBet")).toHaveTextContent("—");
     expect(container.querySelectorAll("[data-cockpit-camel]")).toHaveLength(0);
+  });
+
+  describe("desert recommendations", () => {
+    const options = [
+      { kind: "mirage", space: 10, expectedCoins: 1.256 },
+      { kind: "oasis", space: 4, expectedCoins: 0.75 },
+      { kind: "oasis", space: 12, expectedCoins: 0.4 },
+      { kind: "mirage", space: 8, expectedCoins: 0.2 },
+      { kind: "oasis", space: 15, expectedCoins: 0.1 },
+    ] as const;
+    const withOptions: CockpitResponse = { ...evaluation, desert: { options } };
+
+    it("renders up to four recommendations in the order supplied by the backend", () => {
+      const { container } = render(<Cockpit evaluation={withOptions} error={null} />);
+      const rows = [...container.querySelectorAll<HTMLElement>("[data-desert-option]")];
+
+      expect(rows.map((row) => [row.dataset.desertKind, row.dataset.desertSpace])).toEqual([
+        ["mirage", "10"],
+        ["oasis", "4"],
+        ["oasis", "12"],
+        ["mirage", "8"],
+      ]);
+      expect(rows.map((row) => row.querySelector("[data-expected-coins]")?.textContent)).toEqual([
+        "1.26",
+        "0.75",
+        "0.40",
+        "0.20",
+      ]);
+      expect(rows.map((row) => row.querySelector(".cockpit-desert-space")?.textContent)).toEqual([
+        "10",
+        "4",
+        "12",
+        "8",
+      ]);
+      expect(getRow(container, "desert")).not.toHaveTextContent("Space 10");
+      expect(rows.every((row) => row.children.length === 3)).toBe(true);
+    });
+
+    it("shows the tile artwork as an icon instead of the face name", () => {
+      const { container } = render(<Cockpit evaluation={withOptions} error={null} />);
+      const rows = [...container.querySelectorAll<HTMLElement>("[data-desert-option]")];
+      const mirageIcon = rows[0].querySelector<SVGSVGElement>(".cockpit-desert-icon");
+      const oasisIcon = rows[1].querySelector<SVGSVGElement>(".cockpit-desert-icon");
+
+      expect(mirageIcon).not.toBeNull();
+      expect(mirageIcon?.querySelector(".desert-tile-surface")).toBeInTheDocument();
+      expect(mirageIcon?.querySelector(".desert-mirage-dune")).toBeInTheDocument();
+      expect(mirageIcon?.querySelector(".desert-oasis-water")).not.toBeInTheDocument();
+      expect(oasisIcon?.querySelector(".desert-oasis-water")).toBeInTheDocument();
+      expect(oasisIcon?.querySelector(".desert-mirage-dune")).not.toBeInTheDocument();
+      expect(rows[0]).toHaveAttribute("aria-label", "mirage on space 10");
+      expect(getRow(container, "desert")).not.toHaveTextContent("Mirage");
+      expect(getRow(container, "desert")).not.toHaveTextContent("Oasis");
+    });
+
+    it("shows a placeholder when there are no options or an older backend", () => {
+      const empty: CockpitResponse = { ...withOptions, desert: { options: [] } };
+      const { container, rerender } = render(<Cockpit evaluation={empty} error={null} />);
+
+      expect(getRow(container, "desert")).toHaveTextContent("—");
+      expect(container.querySelectorAll("[data-desert-option]")).toHaveLength(0);
+
+      rerender(<Cockpit evaluation={evaluation} error={null} />);
+
+      expect(getRow(container, "desert")).toHaveTextContent("—");
+      expect(container.querySelectorAll("[data-desert-option]")).toHaveLength(0);
+    });
   });
 });

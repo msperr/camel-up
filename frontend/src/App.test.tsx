@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import { BOARD_SPACES } from "./boardLayout";
 
 const getDice = (container: HTMLElement) => [
   ...container.querySelectorAll<SVGGElement>("[data-die]"),
@@ -62,6 +63,17 @@ const getBetCardsFor = (container: HTMLElement, color: string) =>
 
 const takeTopBet = (label: string) =>
   fireEvent.click(screen.getByRole("button", { name: `Take ${label} leg-bet tile` }));
+
+const getDesertPlaceButtons = (container: HTMLElement) => [
+  ...container.querySelectorAll<SVGGElement>("[data-desert-place-space]"),
+];
+
+const getPlacedDeserts = (container: HTMLElement) => [
+  ...container.querySelectorAll<SVGGElement>("[data-desert]"),
+];
+
+const openDesertDialogFor = (space: number) =>
+  fireEvent.click(screen.getByRole("button", { name: `Place a desert tile on space ${space}` }));
 
 const fillRound = (values: readonly string[]) => {
   DIE_COLORS.forEach((color, index) => addDie(color, values[index]));
@@ -956,5 +968,178 @@ describe("App", () => {
     fillRound(["1", "2", "3", "1", "2"]);
 
     expect(ticketValue()).toHaveTextContent("—");
+  });
+
+  describe("desert tile placement", () => {
+    it("offers only legal fields once a leg has started", () => {
+      const { container } = render(<App />);
+
+      expect(screen.getByRole("group", { name: "Desert tile placement" })).toBeInTheDocument();
+      expect(getDesertPlaceButtons(container)).toHaveLength(0);
+
+      completeSetup();
+      const spaces = getDesertPlaceButtons(container).map((field) =>
+        Number(field.dataset.desertPlaceSpace),
+      );
+
+      expect(spaces).toEqual(Array.from({ length: 15 }, (_, index) => index + 2));
+
+      addDie("white", "1");
+      // The white unit and its passengers now stand on space 2.
+      expect(
+        getDesertPlaceButtons(container).some((field) => field.dataset.desertPlaceSpace === "2"),
+      ).toBe(false);
+
+      (["yellow", "orange", "green", "blue"] as const).forEach((color) => addDie(color, "1"));
+      expect(getDesertPlaceButtons(container)).toHaveLength(0);
+    }, 20000);
+
+    it("shows only a small plus at the top right of legal fields", () => {
+      const { container } = render(<App />);
+      completeSetup();
+      const field = getDesertPlaceButtons(container)[0];
+      const space = Number(field.dataset.desertPlaceSpace);
+      const layout = BOARD_SPACES.find((item) => item.space === space);
+      const icon = field.querySelector<SVGGElement>(".desert-add-icon");
+      const translate = icon?.getAttribute("transform")?.match(/translate\(([-\d.]+) ([-\d.]+)\)/);
+
+      expect(layout).toBeDefined();
+      expect(translate).not.toBeNull();
+      expect(Number(translate?.[1])).toBeGreaterThan(layout?.x ?? 0);
+      expect(Number(translate?.[2])).toBeLessThan(layout?.y ?? 0);
+      expect(icon?.querySelector("circle")).not.toBeInTheDocument();
+      expect(icon?.querySelectorAll("path")).toHaveLength(1);
+    });
+
+    it("places a flat oasis without a badge behind the camels and reports it", async () => {
+      const { container } = render(<App />);
+      completeSetup();
+
+      openDesertDialogFor(5);
+
+      expect(screen.getByRole("dialog", { name: "Place a desert tile" })).toBeInTheDocument();
+      expect(container.querySelector('[data-page-content="true"]')).toHaveAttribute("inert");
+      expect(document.body.style.overflow).toBe("hidden");
+      const oasis = screen.getByRole("button", { name: "Place oasis on space 5" });
+      const mirage = screen.getByRole("button", { name: "Place mirage on space 5" });
+      await waitFor(() => expect(oasis).toHaveFocus());
+
+      fireEvent.click(oasis);
+
+      const tile = getPlacedDeserts(container)[0];
+      expect(screen.queryByRole("dialog", { name: "Place a desert tile" })).not.toBeInTheDocument();
+      expect(tile).toMatchObject({
+        dataset: expect.objectContaining({
+          desert: "oasis",
+          desertSpace: "5",
+        }),
+      });
+      expect(tile.querySelector(".desert-badge")).not.toBeInTheDocument();
+      expect(tile.querySelector("circle")).not.toBeInTheDocument();
+      const camels = container.querySelector('[data-camels="true"]');
+      expect(tile.compareDocumentPosition(camels as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+      expect(screen.getByRole("status")).toHaveTextContent("oasis on 5");
+      expect(screen.getByRole("button", { name: "Clear" })).toBeEnabled();
+      expect(
+        getDesertPlaceButtons(container).map((field) => field.dataset.desertPlaceSpace),
+      ).not.toContain("5");
+      expect(mirage).not.toBeInTheDocument();
+
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", { name: "Place a desert tile on space 7" }),
+        ).toHaveFocus(),
+      );
+    });
+
+    it("moves a camel one extra space forward over an oasis", () => {
+      const { container } = render(<App />);
+      completeSetup();
+      openDesertDialogFor(2);
+      fireEvent.click(screen.getByRole("button", { name: "Place oasis on space 2" }));
+
+      addDie("white", "1");
+
+      expect(getCamelInfo(container).map(({ space }) => space)).toEqual(["3", "3", "3", "3", "3"]);
+    });
+
+    it("moves a camel one space back over a mirage", () => {
+      const { container } = render(<App />);
+      completeSetup();
+      openDesertDialogFor(3);
+      fireEvent.click(screen.getByRole("button", { name: "Place mirage on space 3" }));
+
+      addDie("white", "2");
+
+      expect(getCamelInfo(container).map(({ space }) => space)).toEqual(["2", "2", "2", "2", "2"]);
+    });
+
+    it("sends placed tiles with the API request", async () => {
+      const fetchMock = vi.mocked(fetch);
+      const { container } = render(<App />);
+      completeSetup();
+      openDesertDialogFor(6);
+      fireEvent.click(screen.getByRole("button", { name: "Place mirage on space 6" }));
+
+      await waitFor(() => {
+        const lastCall = fetchMock.mock.calls.at(-1);
+        const body = JSON.parse(lastCall?.[1]?.body as string) as {
+          deserts: readonly { space: number; kind: string }[];
+        };
+        expect(body.deserts).toEqual([{ space: 6, kind: "mirage" }]);
+      });
+      expect(container.querySelector('[data-desert="mirage"]')).toBeInTheDocument();
+    });
+
+    it("supports keyboard activation, Escape, backdrop dismissal and focus restoration", async () => {
+      const { container } = render(<App />);
+      completeSetup();
+      const field = screen.getByRole("button", { name: "Place a desert tile on space 8" });
+
+      field.focus();
+      fireEvent.keyDown(field, { key: "Enter" });
+      expect(screen.getByRole("dialog", { name: "Place a desert tile" })).toBeInTheDocument();
+
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(screen.queryByRole("dialog", { name: "Place a desert tile" })).not.toBeInTheDocument();
+      expect(getPlacedDeserts(container)).toHaveLength(0);
+      await waitFor(() => expect(field).toHaveFocus());
+
+      openDesertDialogFor(8);
+      const backdrop = container.querySelector(".dice-dialog-backdrop");
+      fireEvent.mouseDown(backdrop as Element, { button: 0 });
+      expect(screen.queryByRole("dialog", { name: "Place a desert tile" })).not.toBeInTheDocument();
+      await waitFor(() => expect(field).toHaveFocus());
+
+      field.focus();
+      fireEvent.keyDown(field, { key: " " });
+      expect(screen.getByRole("dialog", { name: "Place a desert tile" })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(getPlacedDeserts(container)).toHaveLength(0);
+      await waitFor(() => expect(field).toHaveFocus());
+    });
+
+    it("clears tiles on Clear and on Next round", () => {
+      const { container } = render(<App />);
+      completeSetup();
+      openDesertDialogFor(9);
+      fireEvent.click(screen.getByRole("button", { name: "Place oasis on space 9" }));
+
+      fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+
+      expect(getPlacedDeserts(container)).toHaveLength(0);
+      expect(getDesertPlaceButtons(container)).toHaveLength(0);
+
+      completeSetup();
+      openDesertDialogFor(9);
+      fireEvent.click(screen.getByRole("button", { name: "Place oasis on space 9" }));
+      fillRound(["1", "1", "1", "1", "1"]);
+      fireEvent.click(screen.getByRole("button", { name: "Next round" }));
+
+      expect(getPlacedDeserts(container)).toHaveLength(0);
+      expect(getDesertPlaceButtons(container).length).toBeGreaterThan(0);
+    }, 20000);
   });
 });

@@ -26,7 +26,7 @@ import {
 } from "./boardLayout";
 import {
   CAMEL_COLORS,
-  applyDie,
+  applyDieWithDeserts,
   createRaceState,
   hasCamels,
   isRaceFinished,
@@ -35,6 +35,18 @@ import {
   type RaceState,
 } from "./camelRace";
 import {
+  createPlacedDesert,
+  DESERT_ART_VIEWBOX,
+  DESERT_PLUS_ARM,
+  DESERT_PLUS_INSET,
+  getDesertArtTransform,
+  getDesertTilePlacement,
+  isLegalDesertPlacement,
+  type DesertKind,
+  type DesertTilePlacement,
+  type PlacedDesert,
+} from "./desertTiles";
+import {
   createLegBetState,
   getLegBetValues,
   hasTakenLegBet,
@@ -42,8 +54,13 @@ import {
   type LegBetState,
   type LegBetValue,
 } from "./legBets";
+import DesertArtwork from "./DesertArtwork";
 import Cockpit from "./Cockpit";
-import { buildCockpitRequest, fetchCockpitEvaluation, type CockpitResponse } from "./cockpit";
+import {
+  buildCockpitRequestWithDeserts,
+  fetchCockpitEvaluation,
+  type CockpitResponse,
+} from "./cockpit";
 
 type DieStyle = {
   readonly label: string;
@@ -63,6 +80,12 @@ type ThrownDie = {
   readonly color: CamelColor;
   readonly value: DieValue;
 };
+
+/** One dialog at a time; the desert dialog remembers the field it came from. */
+type DialogState =
+  { readonly kind: "dice" } | { readonly kind: "desert"; readonly space: number } | null;
+
+type FocusTarget = "add" | "clear" | "next" | { readonly space: number };
 
 const MAX_DICE = CAMEL_COLORS.length;
 
@@ -202,6 +225,33 @@ function CamelPiece({ color, x, y, space, stackIndex, finished = false }: CamelP
   );
 }
 
+/** A flat cardboard tile drawn inside its track field, behind the camel pieces. */
+function DesertTile({
+  desert,
+  placement,
+}: {
+  readonly desert: PlacedDesert;
+  readonly placement: DesertTilePlacement;
+}) {
+  return (
+    <g
+      data-desert={desert.kind}
+      data-desert-space={desert.space}
+      transform={getDesertArtTransform(placement)}
+      filter="url(#tile-shadow)"
+    >
+      <rect
+        width={DESERT_ART_VIEWBOX}
+        height={DESERT_ART_VIEWBOX}
+        rx="10"
+        className="desert-tile-surface"
+      />
+      <rect x="6" y="6" width="88" height="88" rx="7" className="desert-tile-inner" />
+      <DesertArtwork kind={desert.kind} />
+    </g>
+  );
+}
+
 type LegBetCardProps = {
   readonly color: CamelColor;
   readonly value: LegBetValue;
@@ -317,23 +367,21 @@ function RandomIcon() {
   );
 }
 
-type FocusTarget = "add" | "clear" | "next";
-
 export default function App() {
   const [dice, setDice] = useState<readonly ThrownDie[]>([]);
   const [race, setRace] = useState<RaceState>(createRaceState);
   const [legBets, setLegBets] = useState<LegBetState>(createLegBetState);
+  const [deserts, setDeserts] = useState<readonly PlacedDesert[]>([]);
   const [isSetupRound, setIsSetupRound] = useState(true);
   const [cockpit, setCockpit] = useState<CockpitResponse | null>(null);
   const [cockpitError, setCockpitError] = useState<string | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [dialog, setDialog] = useState<DialogState>(null);
   const [selectedColor, setSelectedColor] = useState<CamelColor | "">("");
   const [selectedValue, setSelectedValue] = useState<DieValue | "">("");
   const [focusAfterClose, setFocusAfterClose] = useState<FocusTarget | null>(null);
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const clearButtonRef = useRef<HTMLButtonElement>(null);
   const nextRoundButtonRef = useRef<HTMLButtonElement>(null);
-  const colorSelectRef = useRef<HTMLSelectElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
   const remainingColors = CAMEL_COLORS.filter((color) => !dice.some((die) => die.color === color));
@@ -342,26 +390,67 @@ export default function App() {
   const hasDice = dice.length > 0;
   const canAddDie = remainingColors.length > 0 && !raceFinished;
   const canStartNextRound = dice.length === MAX_DICE && !raceFinished;
-  // Setup dice only place the camels; leg betting starts with the first leg.
+  // Setup dice only place the camels; leg betting and desert tiles start with the first leg.
   const canTakeLegBet = !isSetupRound && dice.length < MAX_DICE && !raceFinished;
-  const canClear = hasDice || camelsOnBoard || hasTakenLegBet(legBets);
 
-  const defaultFocusTarget = (): FocusTarget =>
-    canAddDie ? "add" : canStartNextRound ? "next" : "clear";
+  const legalDesertSpaces = BOARD_SPACES.filter((space) =>
+    isLegalDesertPlacement(space.space, race, deserts),
+  ).map((space) => space.space);
+  const canPlaceDesert = canTakeLegBet && camelsOnBoard && legalDesertSpaces.length > 0;
+
+  const canClear = hasDice || camelsOnBoard || hasTakenLegBet(legBets) || deserts.length > 0;
+
+  const isDialogOpen = dialog !== null;
+
+  const defaultFocusTarget = (): FocusTarget => {
+    if (dialog?.kind === "desert") {
+      return { space: dialog.space };
+    }
+    return canAddDie ? "add" : canStartNextRound ? "next" : "clear";
+  };
 
   const closeDialog = (focusTarget: FocusTarget = defaultFocusTarget()) => {
     setFocusAfterClose(focusTarget);
-    setIsDialogOpen(false);
+    setDialog(null);
   };
 
-  const openDialog = () => {
+  const openDiceDialog = () => {
     if (!canAddDie) {
       return;
     }
 
     setSelectedColor("");
     setSelectedValue("");
-    setIsDialogOpen(true);
+    setDialog({ kind: "dice" });
+  };
+
+  const openDesertDialog = (space: number) => {
+    if (!canPlaceDesert || !legalDesertSpaces.includes(space)) {
+      return;
+    }
+
+    setDialog({ kind: "desert", space });
+  };
+
+  const placeDesert = (kind: DesertKind) => {
+    if (dialog?.kind !== "desert") {
+      return;
+    }
+
+    const space = dialog.space;
+    if (!legalDesertSpaces.includes(space)) {
+      closeDialog();
+      return;
+    }
+
+    const placed = [...deserts, createPlacedDesert(space, kind)];
+    const nextSpace = [
+      ...legalDesertSpaces.filter((candidate) => candidate > space),
+      ...legalDesertSpaces.filter((candidate) => candidate < space),
+    ].find((candidate) => isLegalDesertPlacement(candidate, race, placed));
+
+    setDeserts(placed);
+    closeDialog(nextSpace === undefined ? "add" : { space: nextSpace });
   };
 
   useEffect(() => {
@@ -369,19 +458,27 @@ export default function App() {
       return;
     }
 
-    colorSelectRef.current?.focus();
+    dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus();
 
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") {
-        setFocusAfterClose(canAddDie ? "add" : canStartNextRound ? "next" : "clear");
-        setIsDialogOpen(false);
+        setFocusAfterClose(
+          dialog?.kind === "desert"
+            ? { space: dialog.space }
+            : canAddDie
+              ? "add"
+              : canStartNextRound
+                ? "next"
+                : "clear",
+        );
+        setDialog(null);
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
 
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [canAddDie, canStartNextRound, isDialogOpen]);
+  }, [canAddDie, canStartNextRound, dialog, isDialogOpen]);
 
   useEffect(() => {
     if (!isDialogOpen) {
@@ -440,11 +537,17 @@ export default function App() {
     }
 
     const target =
-      focusAfterClose === "add"
-        ? addButtonRef.current
-        : focusAfterClose === "next"
-          ? nextRoundButtonRef.current
-          : clearButtonRef.current;
+      typeof focusAfterClose === "string"
+        ? focusAfterClose === "add"
+          ? addButtonRef.current
+          : focusAfterClose === "next"
+            ? nextRoundButtonRef.current
+            : clearButtonRef.current
+        : (document.querySelector<HTMLElement>(
+            `[data-desert-place-space="${focusAfterClose.space}"]`,
+          ) ??
+          document.querySelector<HTMLElement>("[data-desert-place-space]") ??
+          addButtonRef.current);
 
     target?.focus();
     setFocusAfterClose(null);
@@ -457,7 +560,7 @@ export default function App() {
     setCockpit(null);
 
     fetchCockpitEvaluation(
-      buildCockpitRequest(dice, race, legBets, isSetupRound),
+      buildCockpitRequestWithDeserts(dice, race, legBets, isSetupRound, deserts),
       controller.signal,
     )
       .then((evaluation) => {
@@ -474,7 +577,7 @@ export default function App() {
       });
 
     return () => controller.abort();
-  }, [dice, race, legBets, isSetupRound]);
+  }, [dice, race, legBets, isSetupRound, deserts]);
 
   const randomizeDie = () => {
     if (remainingColors.length === 0) {
@@ -498,7 +601,7 @@ export default function App() {
     }
 
     const willFillTray = dice.length + 1 >= MAX_DICE;
-    const nextRace = applyDie(race, selectedColor, selectedValue);
+    const nextRace = applyDieWithDeserts(race, selectedColor, selectedValue, deserts);
     const focusTarget: FocusTarget = isRaceFinished(nextRace)
       ? "clear"
       : willFillTray
@@ -526,6 +629,7 @@ export default function App() {
     setDice([]);
     setRace(createRaceState());
     setLegBets(createLegBetState());
+    setDeserts([]);
     setIsSetupRound(true);
     setFocusAfterClose("add");
   };
@@ -537,6 +641,7 @@ export default function App() {
 
     setDice([]);
     setLegBets(createLegBetState());
+    setDeserts([]);
     setIsSetupRound(false);
     setFocusAfterClose("add");
   };
@@ -556,6 +661,11 @@ export default function App() {
     : camelPositions.length > 0
       ? `Camels: ${camelPositions.join(", ")}.`
       : "No camels";
+
+  const desertStatus =
+    deserts.length > 0
+      ? `Deserts: ${deserts.map((desert) => `${desert.kind} on ${desert.space}`).join(", ")}.`
+      : "No deserts";
 
   const addButtonStyle = {
     left: `${(DICE_ADD_BUTTON.x / BOARD_VIEWBOX.width) * 100}%`,
@@ -586,6 +696,13 @@ export default function App() {
   });
 
   const finishedCenters = race.finished ? getFinishOverflowCenters(race.finished.length) : [];
+
+  const desertPieces = deserts.flatMap((desert) => {
+    const placement = getDesertTilePlacement(desert.space);
+    return placement === null
+      ? []
+      : [<DesertTile key={desert.space} desert={desert} placement={placement} />];
+  });
 
   const legBetStacks = CAMEL_COLORS.map((color, colorIndex) => {
     const remaining = legBets[color];
@@ -706,7 +823,7 @@ export default function App() {
                   the fields, stacked tightly when they share one. A camel that passes the finish
                   line is drawn just above it, outside the track. The light central three by three
                   panel contains a centred three by one tray for five coloured dice and an add-die
-                  button.
+                  button. Flat desert tiles may lie on empty fields, underneath any passing camels.
                 </desc>
 
                 <defs>
@@ -726,6 +843,15 @@ export default function App() {
                       stdDeviation="1.5"
                       floodColor="#3a2d25"
                       floodOpacity="0.25"
+                    />
+                  </filter>
+                  <filter id="tile-shadow" x="-30%" y="-30%" width="160%" height="180%">
+                    <feDropShadow
+                      dx="0"
+                      dy="2"
+                      stdDeviation="2"
+                      floodColor="#3a2d25"
+                      floodOpacity="0.28"
                     />
                   </filter>
                   <pattern id="finish-checker" width="10" height="10" patternUnits="userSpaceOnUse">
@@ -839,6 +965,12 @@ export default function App() {
                   />
                 </g>
 
+                {desertPieces.length > 0 && (
+                  <g aria-hidden="true" data-deserts="true">
+                    {desertPieces}
+                  </g>
+                )}
+
                 {camelPieces.length > 0 && (
                   <g aria-hidden="true" data-camels="true">
                     {camelPieces}
@@ -872,6 +1004,65 @@ export default function App() {
                 />
               </svg>
 
+              <svg
+                className="desert-placement-layer"
+                viewBox={`0 0 ${BOARD_VIEWBOX.width} ${BOARD_VIEWBOX.height}`}
+                role="group"
+                aria-label="Desert tile placement"
+                data-desert-placement="true"
+              >
+                {BOARD_SPACES.map((space) => {
+                  const legal = canPlaceDesert && legalDesertSpaces.includes(space.space);
+
+                  return (
+                    <g
+                      key={space.space}
+                      data-desert-field={space.space}
+                      className={legal ? "desert-field desert-field--legal" : "desert-field"}
+                      aria-hidden={legal ? undefined : true}
+                      role={legal ? "button" : undefined}
+                      tabIndex={legal ? 0 : undefined}
+                      aria-label={legal ? `Place a desert tile on space ${space.space}` : undefined}
+                      data-desert-place-space={legal ? space.space : undefined}
+                      onClick={legal ? () => openDesertDialog(space.space) : undefined}
+                      onKeyDown={
+                        legal
+                          ? (event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                openDesertDialog(space.space);
+                              }
+                            }
+                          : undefined
+                      }
+                    >
+                      {legal && (
+                        <>
+                          <rect
+                            x={space.x - space.width / 2}
+                            y={space.y - space.height / 2}
+                            width={space.width}
+                            height={space.height}
+                            className="desert-field-hit"
+                          />
+                          <g
+                            transform={`translate(${space.x + space.width / 2 - DESERT_PLUS_INSET} ${
+                              space.y - space.height / 2 + DESERT_PLUS_INSET
+                            })`}
+                            className="desert-add-icon"
+                            aria-hidden="true"
+                          >
+                            <path
+                              d={`M ${-DESERT_PLUS_ARM} 0 H ${DESERT_PLUS_ARM} M 0 ${-DESERT_PLUS_ARM} V ${DESERT_PLUS_ARM}`}
+                            />
+                          </g>
+                        </>
+                      )}
+                    </g>
+                  );
+                })}
+              </svg>
+
               <button
                 ref={addButtonRef}
                 type="button"
@@ -880,7 +1071,7 @@ export default function App() {
                 title="Add die"
                 data-add-die="true"
                 style={addButtonStyle}
-                onClick={openDialog}
+                onClick={openDiceDialog}
                 disabled={!canAddDie}
               >
                 <span aria-hidden="true">+</span>
@@ -913,7 +1104,7 @@ export default function App() {
         </div>
 
         <p className="sr-only" role="status" aria-live="polite" data-dice-status="true">
-          {diceStatus} {camelStatus}
+          {diceStatus} {camelStatus} {desertStatus}
         </p>
       </div>
 
@@ -929,78 +1120,114 @@ export default function App() {
         >
           <div
             ref={dialogRef}
-            className="dice-dialog"
+            className={`dice-dialog${dialog?.kind === "desert" ? " desert-dialog" : ""}`}
             role="dialog"
             aria-modal="true"
-            aria-labelledby="dice-dialog-title"
+            aria-labelledby={
+              dialog?.kind === "desert" ? "desert-dialog-title" : "dice-dialog-title"
+            }
             tabIndex={-1}
           >
-            <h2 id="dice-dialog-title">Add die</h2>
+            {dialog?.kind === "desert" ? (
+              <>
+                <h2 id="desert-dialog-title">Place a desert tile</h2>
+                <p className="desert-dialog-hint">Choose a face for space {dialog.space}.</p>
+                <div className="desert-dialog-choices">
+                  {(["oasis", "mirage"] as const).map((kind) => (
+                    <button
+                      key={kind}
+                      type="button"
+                      className="desert-choice"
+                      aria-label={`Place ${kind} on space ${dialog.space}`}
+                      onClick={() => placeDesert(kind)}
+                    >
+                      <svg className="desert-choice-art" viewBox="0 0 100 100" aria-hidden="true">
+                        <rect width="100" height="100" rx="10" className="desert-tile-surface" />
+                        <DesertArtwork kind={kind} />
+                      </svg>
+                      <span>{kind === "oasis" ? "Oasis" : "Mirage"}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="dice-dialog-actions">
+                  <button
+                    type="button"
+                    className="dialog-button dialog-button--secondary"
+                    onClick={() => closeDialog()}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 id="dice-dialog-title">Add die</h2>
 
-            <div className="dice-dialog-field">
-              <label htmlFor="dice-color">Colour</label>
-              <select
-                id="dice-color"
-                ref={colorSelectRef}
-                value={selectedColor}
-                onChange={(event) => {
-                  const color = CAMEL_COLORS.find((item) => item === event.target.value);
-                  setSelectedColor(color ?? "");
-                }}
-              >
-                <option value="">Choose a colour</option>
-                {remainingColors.map((color) => (
-                  <option key={color} value={color}>
-                    {CAMEL_DIE_STYLES[color].label}
-                  </option>
-                ))}
-              </select>
-            </div>
+                <div className="dice-dialog-field">
+                  <label htmlFor="dice-color">Colour</label>
+                  <select
+                    id="dice-color"
+                    value={selectedColor}
+                    onChange={(event) => {
+                      const color = CAMEL_COLORS.find((item) => item === event.target.value);
+                      setSelectedColor(color ?? "");
+                    }}
+                  >
+                    <option value="">Choose a colour</option>
+                    {remainingColors.map((color) => (
+                      <option key={color} value={color}>
+                        {CAMEL_DIE_STYLES[color].label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            <div className="dice-dialog-field">
-              <label htmlFor="dice-value">Value</label>
-              <select
-                id="dice-value"
-                value={selectedValue}
-                onChange={(event) => {
-                  const value = Number(event.target.value);
-                  setSelectedValue(value === 1 || value === 2 || value === 3 ? value : "");
-                }}
-              >
-                <option value="">Choose a value</option>
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-              </select>
-            </div>
+                <div className="dice-dialog-field">
+                  <label htmlFor="dice-value">Value</label>
+                  <select
+                    id="dice-value"
+                    value={selectedValue}
+                    onChange={(event) => {
+                      const value = Number(event.target.value);
+                      setSelectedValue(value === 1 || value === 2 || value === 3 ? value : "");
+                    }}
+                  >
+                    <option value="">Choose a value</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                  </select>
+                </div>
 
-            <div className="dice-dialog-actions">
-              <button
-                type="button"
-                className="dialog-button dialog-button--secondary dialog-button--icon"
-                aria-label="Randomize selection"
-                title="Randomize selection"
-                onClick={randomizeDie}
-                disabled={remainingColors.length === 0}
-              >
-                <RandomIcon />
-              </button>
-              <button
-                type="button"
-                className="dialog-button dialog-button--secondary"
-                onClick={() => closeDialog()}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="dialog-button dialog-button--primary"
-                onClick={confirmDie}
-                disabled={selectedColor === "" || selectedValue === ""}
-              >
-                OK
-              </button>
-            </div>
+                <div className="dice-dialog-actions">
+                  <button
+                    type="button"
+                    className="dialog-button dialog-button--secondary dialog-button--icon"
+                    aria-label="Randomize selection"
+                    title="Randomize selection"
+                    onClick={randomizeDie}
+                    disabled={remainingColors.length === 0}
+                  >
+                    <RandomIcon />
+                  </button>
+                  <button
+                    type="button"
+                    className="dialog-button dialog-button--secondary"
+                    onClick={() => closeDialog()}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="dialog-button dialog-button--primary"
+                    onClick={confirmDie}
+                    disabled={selectedColor === "" || selectedValue === ""}
+                  >
+                    OK
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

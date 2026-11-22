@@ -100,6 +100,45 @@ body {
   overflow: visible;
 }
 
+/* The placement targets sit above the board but outside its role=img SVG. */
+.desert-placement-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.desert-field--legal {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.desert-field:focus {
+  outline: none;
+}
+
+.desert-field-hit {
+  fill: rgba(0, 0, 0, 0);
+}
+
+.desert-add-icon path {
+  fill: none;
+  stroke: #4e8a84;
+  stroke-width: 3;
+  stroke-linecap: round;
+  opacity: 0.7;
+  transition:
+    opacity 120ms ease,
+    stroke-width 120ms ease;
+}
+
+.desert-field--legal:hover .desert-add-icon path,
+.desert-field--legal:focus-visible .desert-add-icon path {
+  opacity: 1;
+  stroke-width: 4;
+}
+
 .space-tile {
   fill: var(--field);
   stroke: var(--grid);
@@ -226,6 +265,52 @@ body {
   font-weight: 800;
   fill: var(--ink);
   font-variant-numeric: tabular-nums;
+}
+
+/* Flat cardboard tiles, drawn underneath camel pieces. */
+.desert-tile-surface {
+  fill: #e8c483;
+  stroke: #5b3520;
+  stroke-width: 5;
+}
+
+.desert-tile-inner {
+  fill: none;
+  stroke: #b8864f;
+  stroke-width: 2;
+}
+
+.desert-oasis-water {
+  fill: #4fa9b8;
+  stroke: #2f6f78;
+  stroke-width: 2;
+}
+
+.desert-oasis-trunk {
+  fill: none;
+  stroke: #7a4b28;
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.desert-oasis-fronds {
+  fill: none;
+  stroke: #3a6d34;
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.desert-mirage-dune {
+  fill: #d99b5b;
+  stroke: #a86d34;
+  stroke-width: 2;
+}
+
+.desert-mirage-haze {
+  fill: none;
+  stroke: #f8ecd0;
+  stroke-width: 4;
+  stroke-linecap: round;
 }
 
 .cockpit {
@@ -359,6 +444,39 @@ body {
   color: #6b3f22;
 }
 
+.cockpit-deserts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(3px, 0.7vmin, 8px);
+}
+
+.cockpit-desert {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 5px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid #d9bd91;
+  border-radius: 8px;
+}
+
+.cockpit-desert-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.cockpit-desert-space {
+  font-size: 10px;
+  color: #6b3f22;
+  text-align: right;
+}
+
+.cockpit-desert .cockpit-coins {
+  font-size: 11px;
+  text-align: right;
+}
+
 @media (max-width: 620px) {
   .cockpit-row {
     grid-template-columns: 1fr;
@@ -459,6 +577,53 @@ body {
   margin: 0;
   font-size: 1.35rem;
   letter-spacing: 0.02em;
+}
+
+.desert-dialog-hint {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+  color: #6b3f22;
+}
+
+.desert-dialog-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.desert-choice {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 10px;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ink);
+  background: #fffaf0;
+  border: 1px solid #c9a26a;
+  border-radius: 12px;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
+}
+
+.desert-choice:hover {
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(91, 53, 32, 0.16);
+  transform: translateY(-1px);
+}
+
+.desert-choice:focus-visible {
+  outline: 3px solid #2f6f68;
+  outline-offset: 2px;
+}
+
+.desert-choice-art {
+  width: 64px;
+  height: 64px;
 }
 
 .dice-dialog-field {

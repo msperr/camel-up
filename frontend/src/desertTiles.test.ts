@@ -4,12 +4,13 @@ import { createRaceState, type RaceState } from "./camelRace";
 import {
   createPlacedDesert,
   DESERT_ART,
+  DESERT_PLUS_ARM,
+  DESERT_PLUS_INSET,
   DESERT_TILE_SIZE,
   getDesertArtTransform,
   getDesertTilePlacement,
   getLegalDesertPlacements,
   isLegalDesertPlacement,
-  nextDesertBadge,
   type DesertKind,
   type DesertPlacement,
 } from "./desertTiles";
@@ -70,19 +71,16 @@ describe("legal desert placement", () => {
   });
 });
 
-describe("tile badges", () => {
-  it("gives simultaneous tiles distinct, deterministic badges", () => {
-    const first = createPlacedDesert(4, "oasis", []);
-    const second = createPlacedDesert(8, "mirage", [first]);
-
-    expect(first.badge).not.toBe(second.badge);
-    expect(nextDesertBadge([])).toBe(first.badge);
-    expect(nextDesertBadge([first])).toBe(second.badge);
-    expect(nextDesertBadge([])).toBe(createPlacedDesert(6, "oasis", []).badge);
-  });
-});
-
 describe("tile geometry and art", () => {
+  it("creates a tile from its space and face only", () => {
+    expect(createPlacedDesert(4, "oasis")).toEqual({ space: 4, kind: "oasis" });
+  });
+
+  it("keeps the clickable-field plus small and inside the field corner", () => {
+    expect(DESERT_PLUS_INSET).toBeGreaterThan(DESERT_PLUS_ARM);
+    expect(DESERT_PLUS_INSET + DESERT_PLUS_ARM).toBeLessThan(SPACE_WIDTH / 2);
+  });
+
   it("centres a tile inside its field", () => {
     const placement = getDesertTilePlacement(8);
     const field = BOARD_SPACES.find((space) => space.space === 8);
