@@ -24,7 +24,7 @@ At a glance
 |---|---:|---:|---:|---:|---:|
 | Bug | 0 | 0 | 0 | 0 | 0 |
 | Feature | 0 | 0 | 7 | 0 | 7 |
-| Cosmetic | 0 | 0 | 0 | 1 | 1 |
+| Cosmetic | 0 | 0 | 0 | 2 | 2 |
 
 Resolved since the verification: **B-01, B-02, B-04, F-07, F-09**. B-05 was already
 correct in code; only its stale roadmap entry was fixed. B-03 is retained by
@@ -280,6 +280,24 @@ Features
 - **Next step:** Give the board's exhausted leg-bet card stacks a clear disabled
   visual state. The cockpit is out of scope for this item.
 
+### F-11 — Cockpit flicker when reevaluating a new combination — P2
+
+- **Type:** Feature
+- **Classification:** Cosmetic
+- **Where:** `frontend/src/App.tsx` (cockpit `useEffect`)
+- **Finding:** Every change to the dice, board, leg bets, or setup flag clears
+  the current evaluation before the next `POST /api/cockpit/actions` responds.
+  The ticket and leg-bet rows therefore flash placeholders and then the new
+  values on each added die. Availability is now read from the backend response,
+  so a missing evaluation shows both rows as unavailable.
+- **Impact:** Normal input makes the cockpit flicker, and the brief blank state
+  can be mistaken for a backend failure. No rules result is wrong.
+- **Next step:** Keep the previous evaluation visible while a reevaluation is in
+  flight, marked clearly as stale so it cannot be mistaken for the current
+  board, and swap in the new response atomically. Do not show stale values for
+  an action the new snapshot reports as unavailable. Implementation is out of
+  scope for the setup-round work.
+
 Suggested order
 ---------------
 B-01, B-02, B-04 and B-05 are complete on branch `fix/rust-core-bugs`. B-03 is
@@ -302,3 +320,5 @@ the race-finish work.
 7. ~~**Handle F-09 and F-10** — model the setup phase before trusting mid-leg
    values, and add the visual disabled state to the board's card stacks when the
    UI is revisited.~~ F-09 is complete; F-10 remains open.
+8. **Handle F-11** — remove the cockpit flicker during reevaluation once the
+   board/cockpit UI is revisited.
