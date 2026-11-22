@@ -256,7 +256,9 @@ Features
   which taking a leg-bet tile is not available.
 - **Next step:** Model the setup phase in the shared game state: throw all five
   setup dice without coins, then suppress leg-bet values until setup is complete
-  and the board is fully placed.
+  and the board is fully placed. The cockpit's partial-board simulation now
+  averages over the setup stack orders RULES.md section 3 leaves to the players,
+  but it still evaluates a phase where leg bets would not be available.
 
 ### F-10 — Visual disabled state for exhausted board cards — P2
 

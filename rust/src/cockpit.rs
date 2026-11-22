@@ -14,12 +14,21 @@
 //! Monte Carlo simulation supplies the probabilities, so the cockpit works
 //! from the first die onwards. A completely empty board has no evaluable
 //! probabilities and every camel value is `null` (rendered as a blank field).
+//!
+//! Snapshots must be internally consistent: every camel named in `thrownDice`
+//! must be on the board, and before all five camels are placed each camel on
+//! the board must have a thrown die. Otherwise the endpoint returns 400.
+//!
+//! RULES.md section 3 leaves the order of camels sharing a setup space to the
+//! players. Because the frontend enters dice one at a time, the partial-board
+//! simulation draws that order afresh for each scenario, so no colour gets a
+//! systematic advantage from a fixed stacking order.
 
 use crate::simulation::{CAMEL_ORDER, DEFAULT_SEED};
 use crate::{Camel, Space, State, MAX_FIELD};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Guaranteed value of a pyramid ticket at the next leg scoring (RULES.md §7).
 pub const PYRAMID_TICKET_EP: f64 = 1.0;
@@ -115,6 +124,7 @@ pub struct CamelOdds {
 /// malformed snapshots, which the HTTP layer turns into a 400 response.
 pub fn evaluate_cockpit(request: &CockpitRequest) -> Result<CockpitResponse, String> {
     let state = build_state(request)?;
+    validate_snapshot(request, &state)?;
     let already_moved: Vec<Camel> = request
         .thrown_dice
         .iter()
@@ -267,6 +277,50 @@ fn register_camel(seen: &mut BTreeMap<Camel, ()>, camel: Camel) -> Result<(), St
     Ok(())
 }
 
+fn board_camels(state: &State) -> BTreeSet<Camel> {
+    let mut camels = BTreeSet::new();
+    for space in state.data.values() {
+        if let Space::Camels(stack) = space {
+            camels.extend(stack.iter().copied());
+        }
+    }
+    camels
+}
+
+/// Reject board/dice combinations that cannot occur in the game.
+///
+/// Two invariants matter here. First, revealing a die always places or moves
+/// its camel, so a die cannot be listed for a camel that is absent from the
+/// board. Second, while the first leg is still being set up, every camel on
+/// the board must have a listed die; once all five camels are placed, later
+/// legs start with an empty dice list and any subset of dice may have been
+/// revealed.
+fn validate_snapshot(request: &CockpitRequest, state: &State) -> Result<(), String> {
+    let thrown: BTreeSet<Camel> = request
+        .thrown_dice
+        .iter()
+        .map(|&color| color.rules_camel())
+        .collect();
+    let on_board = board_camels(state);
+
+    if let Some(&camel) = thrown.difference(&on_board).next() {
+        return Err(format!(
+            "die for {:?} was thrown but the camel is not on the board",
+            camel
+        ));
+    }
+
+    if on_board.len() < CAMEL_ORDER.len() && thrown.len() != on_board.len() {
+        return Err(format!(
+            "each of the {} camel(s) on the board needs a thrown die, got {}",
+            on_board.len(),
+            thrown.len()
+        ));
+    }
+
+    Ok(())
+}
+
 /// Camel positions are final: each camel is assigned its place with certainty,
 /// as in `expected_leg_bet_coins` when the leg is over.
 fn deterministic_counts(state: &State) -> BTreeMap<Camel, Vec<usize>> {
@@ -298,8 +352,10 @@ fn unplaced_camels(state: &State) -> Vec<Camel> {
 
 /// The frontend's temporary board can omit camels whose die has not been
 /// revealed yet. Each scenario first gives those camels a random starting
-/// space (RULES.md §3), then plays the dice still in the pyramid. A fixed seed
-/// keeps repeated requests for the same snapshot identical.
+/// space (RULES.md §3), then plays the dice still in the pyramid. The order in
+/// which camels sharing a space are stacked is also redrawn per scenario,
+/// since the rules leave that choice to the players. A fixed seed keeps
+/// repeated requests for the same snapshot identical.
 fn simulate_partial_board(
     state: &State,
     already_moved: &[Camel],
@@ -313,7 +369,13 @@ fn simulate_partial_board(
 
     for _ in 0..PARTIAL_BOARD_ITERATIONS {
         let mut scenario = state.clone();
-        for &camel in unplaced {
+        let mut placement_order = unplaced.to_vec();
+        for index in (1..placement_order.len()).rev() {
+            let other = rng.below(index + 1);
+            placement_order.swap(index, other);
+        }
+
+        for &camel in &placement_order {
             let value = (rng.below(3) + 1) as u8;
             // Key 0 is a temporary staging space; the camel leaves it on the
             // very next move, so it never affects the ranking.

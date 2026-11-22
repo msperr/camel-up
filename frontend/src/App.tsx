@@ -452,6 +452,7 @@ export default function App() {
     const controller = new AbortController();
 
     setCockpitError(null);
+    setCockpit(null);
 
     fetchCockpitEvaluation(buildCockpitRequest(dice, race, legBets), controller.signal)
       .then((evaluation) => {
@@ -880,7 +881,7 @@ export default function App() {
             </div>
           </div>
 
-          <Cockpit evaluation={cockpit} error={cockpitError} />
+          <Cockpit evaluation={cockpit} error={cockpitError} diceAvailable={canAddDie} />
 
           <div className="dice-controls" data-dice-controls="true">
             <button

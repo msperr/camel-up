@@ -250,3 +250,165 @@ async fn http_endpoint_rejects_duplicate_camels() {
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
+
+#[test]
+fn rejects_a_die_for_a_camel_that_is_not_on_the_board() {
+    let snapshot = request(json!({
+        "stacks": { "2": ["white"] },
+        "thrownDice": ["blue"],
+        "availableLegBets": all_tiles(5),
+    }));
+
+    let error = evaluate_cockpit(&snapshot).expect_err("inconsistent snapshot");
+
+    assert!(
+        error.contains("not on the board"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn rejects_a_partial_board_whose_camels_have_missing_dice() {
+    let snapshot = request(json!({
+        "stacks": { "2": ["white"] },
+        "thrownDice": [],
+        "availableLegBets": all_tiles(5),
+    }));
+
+    let error = evaluate_cockpit(&snapshot).expect_err("inconsistent snapshot");
+
+    assert!(
+        error.contains("needs a thrown die"),
+        "unexpected error: {error}"
+    );
+}
+
+#[test]
+fn accepts_an_empty_dice_list_for_a_fully_placed_new_leg() {
+    let snapshot = request(json!({
+        "stacks": {
+            "2": ["white"], "5": ["yellow", "orange"],
+            "9": ["green"], "12": ["blue"]
+        },
+        "thrownDice": [],
+        "availableLegBets": all_tiles(5),
+    }));
+
+    let state = State::new(BTreeMap::from([
+        (2, Space::Camels(vec![Camel::White])),
+        (5, Space::Camels(vec![Camel::Yellow, Camel::Orange])),
+        (9, Space::Camels(vec![Camel::Green])),
+        (12, Space::Camels(vec![Camel::Blue])),
+    ]));
+    let (counts, _) = state.simulate_outcomes(&[]);
+    let total: usize = counts[&Camel::White].iter().sum();
+    let result = evaluate_cockpit(&snapshot).expect("a new leg is a valid snapshot");
+
+    for &camel in CAMEL_ORDER.iter() {
+        let expected = counts[&camel][0] as f64 / total as f64;
+        assert!(
+            (odds(&result, test_color(camel))
+                .round_win_probability
+                .unwrap()
+                - expected)
+                .abs()
+                < 1e-12,
+            "p1 for {:?}",
+            camel
+        );
+    }
+}
+
+#[test]
+fn partial_board_with_an_unreachable_leader_is_deterministic() {
+    let snapshot = request(json!({
+        "stacks": { "16": ["white"] },
+        "thrownDice": ["white"],
+        "availableLegBets": all_tiles(5),
+    }));
+
+    let result = evaluate_cockpit(&snapshot).expect("valid snapshot");
+    let white = odds(&result, CamelColor::White);
+
+    assert_eq!(white.round_win_probability, Some(1.0));
+    assert_eq!(white.expected_coins, Some(5.0));
+}
+
+#[test]
+fn unplaced_camels_do_not_have_a_fixed_stacking_order() {
+    let snapshot = request(json!({
+        "stacks": { "2": ["white"] },
+        "thrownDice": ["white"],
+        "availableLegBets": all_tiles(5),
+    }));
+
+    let result = evaluate_cockpit(&snapshot).expect("valid snapshot");
+    let probabilities: Vec<f64> = [
+        CamelColor::Yellow,
+        CamelColor::Orange,
+        CamelColor::Green,
+        CamelColor::Blue,
+    ]
+    .iter()
+    .map(|&color| odds(&result, color).round_win_probability.unwrap())
+    .collect();
+
+    let max = probabilities.iter().copied().fold(0.0_f64, f64::max);
+    let min = probabilities.iter().copied().fold(1.0_f64, f64::min);
+    let spread = max - min;
+    assert!(
+        spread < 0.03,
+        "exchangeable unplaced camels should have similar win probabilities, got {probabilities:?}"
+    );
+}
+
+async fn post(body: serde_json::Value) -> StatusCode {
+    app()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/cockpit/actions")
+                .header("content-type", "application/json")
+                .body(Body::from(body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap()
+        .status()
+}
+
+#[tokio::test]
+async fn http_endpoint_rejects_an_invalid_leg_betting_tile() {
+    let status = post(json!({
+        "stacks": { "2": ["white"] },
+        "thrownDice": ["white"],
+        "availableLegBets": { "white": 7 },
+    }))
+    .await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn http_endpoint_rejects_an_invalid_space() {
+    let status = post(json!({
+        "stacks": { "0": ["white"] },
+        "thrownDice": [],
+        "availableLegBets": {},
+    }))
+    .await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn http_endpoint_rejects_an_inconsistent_dice_list() {
+    let status = post(json!({
+        "stacks": { "2": ["white"] },
+        "thrownDice": ["blue"],
+        "availableLegBets": all_tiles(5),
+    }))
+    .await;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}

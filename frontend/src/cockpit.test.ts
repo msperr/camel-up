@@ -92,12 +92,24 @@ describe("fetchCockpitEvaluation", () => {
     expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({ signal: controller.signal });
   });
 
-  it("reports a failed response with backend startup instructions", async () => {
+  it("reports a failed response without backend startup instructions", async () => {
     vi.mocked(fetch).mockResolvedValueOnce({ ok: false, status: 500 } as Response);
 
     await expect(
       fetchCockpitEvaluation(buildCockpitRequest([], createRaceState(), createLegBetState())),
-    ).rejects.toThrow(/cannot reach the Rust backend at http:\/\/127\.0\.0\.1:3000[\s\S]*HTTP 500/);
+    ).rejects.toThrow(/Cockpit evaluation rejected \(HTTP 500\)/);
+  });
+
+  it("surfaces the backend's validation message", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: "space 0 must be in 1..=16" }),
+    } as Response);
+
+    await expect(
+      fetchCockpitEvaluation(buildCockpitRequest([], createRaceState(), createLegBetState())),
+    ).rejects.toThrow(/HTTP 400\): space 0 must be in 1\.\.=16/);
   });
 
   it("wraps a network failure with backend startup instructions", async () => {
@@ -105,7 +117,7 @@ describe("fetchCockpitEvaluation", () => {
 
     await expect(
       fetchCockpitEvaluation(buildCockpitRequest([], createRaceState(), createLegBetState())),
-    ).rejects.toThrow(/Start it with 'cd rust && cargo run'/);
+    ).rejects.toThrow(/start the Rust backend with 'cd rust && cargo run'/);
   });
 
   it("does not wrap an aborted request", async () => {

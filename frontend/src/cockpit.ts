@@ -12,8 +12,7 @@ import { getLegBetValues, type LegBetState } from "./legBets";
 const COCKPIT_PATH = "/api/cockpit/actions";
 
 const BACKEND_UNAVAILABLE_MESSAGE =
-  "Cockpit evaluation failed: cannot reach the Rust backend at http://127.0.0.1:3000. " +
-  "Start it with 'cd rust && cargo run', then reload.";
+  "Cockpit unavailable: start the Rust backend with 'cd rust && cargo run', then reload.";
 
 export type ThrownDie = {
   readonly color: CamelColor;
@@ -64,24 +63,40 @@ export const buildCockpitRequest = (
   };
 };
 
+/** Read the backend's validation message from a non-2xx response, if present. */
+const rejectionDetail = async (response: Response): Promise<string> => {
+  try {
+    const body: unknown = await response.json();
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      "error" in body &&
+      typeof body.error === "string" &&
+      body.error.length > 0
+    ) {
+      return body.error;
+    }
+  } catch {
+    // A non-JSON error body is still reported with its HTTP status.
+  }
+
+  return "no error details";
+};
+
 /** Ask the Rust API to evaluate the actions for one board snapshot. */
 export const fetchCockpitEvaluation = async (
   request: CockpitRequest,
   signal?: AbortSignal,
 ): Promise<CockpitResponse> => {
+  let response: Response;
+
   try {
-    const response = await fetch(COCKPIT_PATH, {
+    response = await fetch(COCKPIT_PATH, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
       signal,
     });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    return (await response.json()) as CockpitResponse;
   } catch (error) {
     if (signal?.aborted) {
       throw error;
@@ -90,4 +105,13 @@ export const fetchCockpitEvaluation = async (
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(`${BACKEND_UNAVAILABLE_MESSAGE} Details: ${detail}`, { cause: error });
   }
+
+  // A validation failure is a reply from a healthy backend. Surface its
+  // message rather than telling the user to start the server.
+  if (!response.ok) {
+    const detail = await rejectionDetail(response);
+    throw new Error(`Cockpit evaluation rejected (HTTP ${response.status}): ${detail}`);
+  }
+
+  return (await response.json()) as CockpitResponse;
 };

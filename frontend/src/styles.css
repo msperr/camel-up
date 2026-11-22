@@ -35,7 +35,8 @@ body {
   --page-gutter: clamp(12px, 3vmin, 32px);
   --controls-height: 44px;
   --controls-gap: clamp(12px, 2vmin, 18px);
-  --cockpit-height: 168px;
+  /* Room for the four action rows plus a two-line backend error. */
+  --cockpit-height: 200px;
   display: grid;
   place-items: center;
   min-height: 100svh;
@@ -252,6 +253,10 @@ body {
   border-radius: 8px;
   font-size: 12px;
   line-height: 1.3;
+  /* Keep the panel inside the height reserved by --cockpit-height. */
+  max-height: 2.8em;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
 }
 
 .cockpit-row {

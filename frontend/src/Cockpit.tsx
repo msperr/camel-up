@@ -4,6 +4,8 @@ import type { CamelOdds, CockpitResponse } from "./cockpit";
 type CockpitProps = {
   readonly evaluation: CockpitResponse | null;
   readonly error: string | null;
+  /** Whether a pyramid ticket is still available to take this leg. */
+  readonly diceAvailable?: boolean;
 };
 
 const formatCoins = (coins: number | null): string => (coins === null ? "" : coins.toFixed(2));
@@ -32,9 +34,10 @@ const camelsForEvaluation = (evaluation: CockpitResponse | null): readonly Camel
  * pyramid-ticket roll and the leg-betting tile are evaluated; the desert and
  * overall-bet rows are placeholders. The leg-betting values come from the Rust
  * backend, so an unavailable backend is reported here instead of silently
- * removing the camel columns.
+ * removing the camel columns. The ticket value is blanked once the leg is over
+ * and no ticket can be taken.
  */
-export default function Cockpit({ evaluation, error }: CockpitProps) {
+export default function Cockpit({ evaluation, error, diceAvailable = true }: CockpitProps) {
   const camels = camelsForEvaluation(evaluation);
 
   return (
@@ -47,8 +50,11 @@ export default function Cockpit({ evaluation, error }: CockpitProps) {
 
       <div className="cockpit-row" data-action="dice">
         <span className="cockpit-label">Take a pyramid ticket and roll</span>
-        <span className="cockpit-value" data-expected-coins>
-          {formatCoins(evaluation?.dice.expectedCoins ?? null)}
+        <span
+          className={diceAvailable ? "cockpit-value" : "cockpit-placeholder"}
+          data-expected-coins
+        >
+          {diceAvailable ? formatCoins(evaluation?.dice.expectedCoins ?? null) : "—"}
         </span>
       </div>
 

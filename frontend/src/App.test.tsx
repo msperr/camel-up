@@ -837,4 +837,49 @@ describe("App", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/Rust backend/);
     expect(container.querySelectorAll("[data-cockpit-camel]")).toHaveLength(5);
   });
+
+  it("surfaces a backend validation error instead of startup instructions", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: "space 0 must be in 1..=16" }),
+    } as Response);
+    render(<App />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("space 0 must be in 1..=16");
+    expect(screen.getByRole("alert")).not.toHaveTextContent("cargo run");
+  });
+
+  it("clears the previous evaluation while a new one is in flight", async () => {
+    let resolvePending!: (response: Response) => void;
+    const pending = new Promise<Response>((resolve) => {
+      resolvePending = resolve;
+    });
+    const evaluation = {
+      ok: true,
+      status: 200,
+      json: async () => ({ dice: { expectedCoins: 1 }, legBet: { camels: [] } }),
+    } as Response;
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementationOnce(async () => evaluation).mockImplementationOnce(() => pending);
+
+    const { container } = render(<App />);
+    const ticketValue = () => container.querySelector('[data-action="dice"] [data-expected-coins]');
+    await waitFor(() => expect(ticketValue()).toHaveTextContent("1.00"));
+
+    addDie("white", "2");
+
+    expect(ticketValue()).toBeEmptyDOMElement();
+    resolvePending(evaluation);
+    await waitFor(() => expect(ticketValue()).toHaveTextContent("1.00"));
+  });
+
+  it("blanks the ticket value once all five dice are thrown", () => {
+    const { container } = render(<App />);
+    const ticketValue = () => container.querySelector('[data-action="dice"] [data-expected-coins]');
+
+    fillRound(["1", "2", "3", "1", "2"]);
+
+    expect(ticketValue()).toHaveTextContent("—");
+  });
 });

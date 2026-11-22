@@ -88,6 +88,16 @@ describe("Cockpit", () => {
     expect(getRow(container, "overall")).toHaveTextContent("—");
   });
 
+  it("blanks the ticket value once no pyramid ticket is available", () => {
+    const { container } = render(
+      <Cockpit evaluation={evaluation} error={null} diceAvailable={false} />,
+    );
+    const row = getRow(container, "dice");
+
+    expect(row).toHaveTextContent("—");
+    expect(row).not.toHaveTextContent("1.00");
+  });
+
   it("is read only", () => {
     const { container } = render(<Cockpit evaluation={evaluation} error={null} />);
 
