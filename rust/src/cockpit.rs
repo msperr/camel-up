@@ -373,8 +373,10 @@ fn desert_options(state: &State, already_moved: &[Camel]) -> Vec<DesertOption> {
 
 /// Estimate desert income when some camels have not been placed yet. Each
 /// scenario first completes the board with a fixed-seed draw, then plays one
-/// random remainder of the leg with the hypothetical tile in place. Candidates
-/// that become illegal in a sample are skipped for that sample.
+/// random remainder of the leg with the hypothetical tile in place. Every
+/// landing on the tile is counted, since a stacked unit can trigger it twice in
+/// one leg. Candidates that become illegal in a sample are skipped for that
+/// sample.
 fn desert_income_partial_board(
     state: &State,
     already_moved: &[Camel],
@@ -419,9 +421,7 @@ fn desert_income_partial_board(
                 .map(|camel| (camel, (rng.below(3) + 1) as u8));
 
             let hit_counts = State::new(board).simulate_moves_hits(moves);
-            if hit_counts.contains_key(&space) {
-                *hits.entry(key).or_insert(0) += 1;
-            }
+            record_desert_hits(&mut hits, key, &hit_counts, space);
             *totals.entry(key).or_insert(0) += 1;
         }
     }
@@ -435,6 +435,18 @@ fn desert_income_partial_board(
             .insert(tile, hit_count as f64 / total as f64);
     }
     result
+}
+
+/// Add every landing on `space` in one sampled leg to `hits`. A stacked unit can
+/// trigger the same tile more than once (RULES.md section 6), so checking only
+/// whether the space appears in `hit_counts` would undercount direct income.
+fn record_desert_hits(
+    hits: &mut BTreeMap<(u8, DesertTile), usize>,
+    key: (u8, DesertTile),
+    hit_counts: &BTreeMap<u8, usize>,
+    space: u8,
+) {
+    *hits.entry(key).or_insert(0) += hit_counts.get(&space).copied().unwrap_or(0);
 }
 
 fn build_state(request: &CockpitRequest) -> Result<State, String> {
@@ -691,5 +703,27 @@ impl Rng {
     fn below(&mut self, upper: usize) -> usize {
         debug_assert!(upper > 0);
         ((self.next_u64() as u128 * upper as u128) >> 64) as usize
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn record_desert_hits_counts_every_landing() {
+        let mut hits = BTreeMap::new();
+        let key = (7, DesertTile::Mirage);
+        let hit_counts = BTreeMap::from([(7, 2usize)]);
+
+        record_desert_hits(&mut hits, key, &hit_counts, 7);
+        assert_eq!(hits.get(&key), Some(&2));
+
+        // A different space contributes nothing.
+        record_desert_hits(&mut hits, key, &hit_counts, 8);
+        assert_eq!(hits.get(&key), Some(&2));
+
+        record_desert_hits(&mut hits, key, &hit_counts, 7);
+        assert_eq!(hits.get(&key), Some(&4));
     }
 }

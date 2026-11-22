@@ -1047,4 +1047,14 @@ mod fast_simulator_tests {
         let (_, expected) = board.move_multiple_units(moves);
         assert_eq!(board.simulate_moves_hits(moves), expected);
     }
+
+    #[test]
+    fn fast_move_hits_count_multiple_landings_on_one_tile() {
+        let board = mirage_board();
+        let moves = [(Camel::White, 2u8), (Camel::Yellow, 1u8)];
+        assert_eq!(
+            board.simulate_moves_hits(moves),
+            BTreeMap::from([(7, 2usize)])
+        );
+    }
 }
