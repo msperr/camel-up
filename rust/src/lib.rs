@@ -1,8 +1,14 @@
+pub mod api;
+pub mod cockpit;
 pub mod combinatorics;
 pub mod leg_bets;
 pub mod simulation;
 pub mod state;
 
+pub use cockpit::{
+    evaluate_cockpit, CamelColor, CamelOdds, CockpitRequest, CockpitResponse, DiceAction,
+    LegBetAction, PYRAMID_TICKET_EP,
+};
 pub use combinatorics::{Permutations, Product};
 pub use leg_bets::{expected_leg_bet_coins, AvailableLegBets};
 pub use simulation::{

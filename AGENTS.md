@@ -42,6 +42,16 @@ npm run format:check
 npm test
 npm run test:watch
 
+Run / host locally
+------------------
+- When the user asks to run or host the app, start both services directly on
+  localhost immediately; do not start research first. Start the backend first
+  so Vite's `/api` proxy has a target:
+  - `cd rust && cargo run` — API on `http://127.0.0.1:3000`
+  - `cd frontend && npm run dev -- --host 127.0.0.1` — UI on `http://127.0.0.1:5173`
+- The frontend cockpit fails loudly if the backend is not running; the backend
+  is the authoritative source for probabilities and expected coins.
+
 Worktrees and branches
 ---------------------
 - One task = one worktree + one new branch. Never reuse a worktree or branch for a second task.

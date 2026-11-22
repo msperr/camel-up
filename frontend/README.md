@@ -30,8 +30,23 @@ Single-page TypeScript frontend for the Camel Up decision tracker.
   the next tile, and an exhausted stack leaves an empty, non-clickable outline.
   Card clicks are disabled once five dice have been thrown or the race has
   finished. Clear and Next round restore all three tiles for every camel.
-- No backend connection. Camel positions are temporary local UI state for
-  driving the SVG; the Rust crate remains the authoritative rules model.
+- Below the board, a read-only cockpit lists the four actions using their names
+  from RULES.md. “Take a pyramid ticket and roll” shows the ticket's guaranteed
+  +1 EP with no camel columns while a ticket can still be taken; it shows a dash
+  once all five dice are thrown or the race has finished. “Take a leg-betting
+  tile” shows one cell per camel with net expected EP (two decimals) and the
+  probability of winning the round (whole percent), ordered by expected coins,
+  then probability, then colour; an exhausted stack is blank and sorted last.
+  The desert and overall bet rows are placeholders. The cockpit has no controls.
+- Expected values are computed by the Rust crate at `POST /api/cockpit/actions`;
+  Vite proxies `/api` to `127.0.0.1:3000`. Run `cargo run` in `rust/` alongside
+  `npm run dev`. Camel positions remain temporary local UI state for driving
+  the SVG; the Rust crate remains the authoritative rules model. It rejects
+  board/dice combinations that cannot occur, and averages over the setup stack
+  orders left open by RULES.md section 3.
+- Values are cleared while a new snapshot is being evaluated, so they never
+  describe a different board. A validation failure shows the backend's message;
+  only a network failure shows the instruction to start the Rust backend.
 
 The implementation follows the frontend architecture decisions in
 `ROADMAP.md` (D-01 to D-07; currently on the
@@ -72,8 +87,10 @@ frontend/
   index.html
   src/
     App.tsx           # the one page: SVG board, dice, camels, and add-die dialog
+    Cockpit.tsx       # read-only action overview below the board
     boardLayout.ts    # static 5 x 5 map and camel/stack geometry for spaces 1..16
     camelRace.ts      # local camel positions and die-driven movement
+    cockpit.ts        # Rust API request/response client for the cockpit
     legBets.ts        # local 5/3/2 leg-bet tile stacks
     main.tsx
     styles.css
@@ -82,9 +99,11 @@ frontend/
 
 ## Intentionally not built yet
 
-- API client, DTO types, and the Vite development proxy to the Rust server.
+- A general API client, DTO layer, and server snapshot state; the cockpit uses
+  one narrow endpoint and does not dispatch commands.
 - Server snapshot state, command dispatch, revision handling, and undo.
-- Analysis results, progress, caching, and action evaluation.
+- Expected values for the desert-tile and overall-bet actions; their rows are
+  placeholders.
 - Drag-and-drop, edit mode, and legal-action highlighting.
 
 Those belong to the game, analysis, and HTTP adapter layers described in

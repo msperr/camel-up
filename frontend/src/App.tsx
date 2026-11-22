@@ -42,6 +42,8 @@ import {
   type LegBetState,
   type LegBetValue,
 } from "./legBets";
+import Cockpit from "./Cockpit";
+import { buildCockpitRequest, fetchCockpitEvaluation, type CockpitResponse } from "./cockpit";
 
 type DieStyle = {
   readonly label: string;
@@ -321,6 +323,8 @@ export default function App() {
   const [dice, setDice] = useState<readonly ThrownDie[]>([]);
   const [race, setRace] = useState<RaceState>(createRaceState);
   const [legBets, setLegBets] = useState<LegBetState>(createLegBetState);
+  const [cockpit, setCockpit] = useState<CockpitResponse | null>(null);
+  const [cockpitError, setCockpitError] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedColor, setSelectedColor] = useState<CamelColor | "">("");
   const [selectedValue, setSelectedValue] = useState<DieValue | "">("");
@@ -443,6 +447,29 @@ export default function App() {
     target?.focus();
     setFocusAfterClose(null);
   }, [focusAfterClose, isDialogOpen]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    setCockpitError(null);
+    setCockpit(null);
+
+    fetchCockpitEvaluation(buildCockpitRequest(dice, race, legBets), controller.signal)
+      .then((evaluation) => {
+        setCockpit(evaluation);
+        setCockpitError(null);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        console.error("Could not evaluate cockpit actions", error);
+        setCockpit(null);
+        setCockpitError(error instanceof Error ? error.message : String(error));
+      });
+
+    return () => controller.abort();
+  }, [dice, race, legBets]);
 
   const randomizeDie = () => {
     if (remainingColors.length === 0) {
@@ -853,6 +880,8 @@ export default function App() {
               </button>
             </div>
           </div>
+
+          <Cockpit evaluation={cockpit} error={cockpitError} diceAvailable={canAddDie} />
 
           <div className="dice-controls" data-dice-controls="true">
             <button

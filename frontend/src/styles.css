@@ -35,6 +35,8 @@ body {
   --page-gutter: clamp(12px, 3vmin, 32px);
   --controls-height: 44px;
   --controls-gap: clamp(12px, 2vmin, 18px);
+  /* Room for the four action rows plus a two-line backend error. */
+  --cockpit-height: 200px;
   display: grid;
   place-items: center;
   min-height: 100svh;
@@ -50,7 +52,10 @@ body {
   --board-size: min(
     calc(100vw - 2 * var(--page-gutter)),
     calc(
-      (100svh - 2 * var(--page-gutter) - var(--controls-height) - var(--controls-gap)) /
+      (
+          100svh - 2 * var(--page-gutter) - var(--controls-height) - var(--cockpit-height) - 2 *
+            var(--controls-gap)
+        ) /
         var(--bet-scale)
     ),
     1000px
@@ -221,6 +226,149 @@ body {
   font-weight: 800;
   fill: var(--ink);
   font-variant-numeric: tabular-nums;
+}
+
+.cockpit {
+  display: grid;
+  width: var(--board-size);
+  max-width: 100%;
+  min-height: var(--cockpit-height);
+  padding: clamp(8px, 1.4vmin, 14px) clamp(10px, 1.8vmin, 18px);
+  align-content: center;
+  gap: 2px;
+  color: var(--ink);
+  background: rgba(253, 242, 220, 0.94);
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(91, 53, 32, 0.16);
+}
+
+.cockpit-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 6px 8px;
+  color: #8b2c1d;
+  background: #fff1ea;
+  border: 1px solid #d99b82;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.3;
+  /* Keep the panel inside the height reserved by --cockpit-height. */
+  max-height: 2.8em;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+
+.cockpit-row {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) auto;
+  min-height: 34px;
+  align-items: center;
+  gap: 12px;
+  padding: 3px 6px;
+  border-bottom: 1px solid rgba(107, 63, 34, 0.18);
+}
+
+.cockpit-row:last-child {
+  border-bottom: 0;
+}
+
+.cockpit-label {
+  font-size: clamp(12px, 1.5vmin, 15px);
+  font-weight: 700;
+}
+
+.cockpit-value,
+.cockpit-placeholder,
+.cockpit-coins,
+.cockpit-probability {
+  font-variant-numeric: tabular-nums;
+}
+
+.cockpit-value,
+.cockpit-placeholder {
+  text-align: right;
+}
+
+.cockpit-value {
+  font-weight: 800;
+}
+
+.cockpit-placeholder {
+  color: #9b7a58;
+}
+
+.cockpit-camels {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(56px, 1fr));
+  gap: clamp(4px, 1vmin, 10px);
+}
+
+.cockpit-camel {
+  display: grid;
+  grid-template-columns: 10px 1fr;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 5px;
+  padding: 2px 4px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid #d9bd91;
+  border-radius: 8px;
+}
+
+.cockpit-swatch {
+  grid-row: 1 / 3;
+  width: 10px;
+  height: 10px;
+  border: 1px solid #7e6c55;
+  border-radius: 50%;
+}
+
+.cockpit-camel--white .cockpit-swatch {
+  background: #fbf6ea;
+}
+
+.cockpit-camel--yellow .cockpit-swatch {
+  background: #f4c84a;
+}
+
+.cockpit-camel--orange .cockpit-swatch {
+  background: #ea8a3c;
+}
+
+.cockpit-camel--green .cockpit-swatch {
+  background: #6aa55f;
+}
+
+.cockpit-camel--blue .cockpit-swatch {
+  background: #5b8ec2;
+}
+
+.cockpit-coins,
+.cockpit-probability {
+  text-align: right;
+}
+
+.cockpit-coins {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.cockpit-probability {
+  font-size: 11px;
+  color: #6b3f22;
+}
+
+@media (max-width: 620px) {
+  .cockpit-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .cockpit-value,
+  .cockpit-placeholder {
+    text-align: left;
+  }
 }
 
 .dice-controls {
