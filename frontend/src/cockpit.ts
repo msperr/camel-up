@@ -24,6 +24,8 @@ export type CockpitRequest = {
   readonly finished: readonly CamelColor[] | null;
   readonly thrownDice: readonly CamelColor[];
   readonly availableLegBets: Readonly<Record<CamelColor, number | null>>;
+  /** Setup dice only place the camels; leg bets are not available yet. */
+  readonly setupRound: boolean;
 };
 
 export type CamelOdds = {
@@ -36,7 +38,10 @@ export type CamelOdds = {
 
 export type CockpitResponse = {
   readonly dice: { readonly expectedCoins: number };
-  readonly legBet: { readonly camels: readonly CamelOdds[] };
+  readonly legBet: {
+    readonly available: boolean;
+    readonly camels: readonly CamelOdds[];
+  };
 };
 
 /** Turn the current board snapshot into the JSON body the Rust API expects. */
@@ -44,6 +49,7 @@ export const buildCockpitRequest = (
   dice: readonly ThrownDie[],
   race: RaceState,
   legBets: LegBetState,
+  setupRound: boolean,
 ): CockpitRequest => {
   const stacks: Record<string, CamelColor[]> = {};
 
@@ -60,6 +66,7 @@ export const buildCockpitRequest = (
     availableLegBets: Object.fromEntries(
       CAMEL_COLORS.map((color) => [color, getLegBetValues(legBets[color])[0] ?? null]),
     ) as Record<CamelColor, number | null>,
+    setupRound,
   };
 };
 

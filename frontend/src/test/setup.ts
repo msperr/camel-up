@@ -10,7 +10,7 @@ vi.stubGlobal(
   vi.fn(async () => ({
     ok: true,
     status: 200,
-    json: async () => ({ dice: { expectedCoins: 1 }, legBet: { camels: [] } }),
+    json: async () => ({ dice: { expectedCoins: 1 }, legBet: { available: true, camels: [] } }),
   })),
 );
 

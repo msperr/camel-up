@@ -23,10 +23,10 @@ At a glance
 | Type | Wrong behaviour | Latent | Missing feature | Cosmetic | Total |
 |---|---:|---:|---:|---:|---:|
 | Bug | 0 | 0 | 0 | 0 | 0 |
-| Feature | 0 | 0 | 8 | 0 | 8 |
+| Feature | 0 | 0 | 7 | 0 | 7 |
 | Cosmetic | 0 | 0 | 0 | 1 | 1 |
 
-Resolved since the verification: **B-01, B-02, B-04, F-07**. B-05 was already
+Resolved since the verification: **B-01, B-02, B-04, F-07, F-09**. B-05 was already
 correct in code; only its stale roadmap entry was fixed. B-03 is retained by
 design: a desert behind the rearmost camel can never be reached (camel
 positions never decrease across a move), so excluding those spaces loses no
@@ -253,15 +253,18 @@ Features
 - **Classification:** Missing feature
 - **Finding:** RULES.md section 3 rolls all five racing dice once during setup
   to place the camels on spaces 1–3 before play begins. That phase pays no coins
-  and offers no leg bets. The cockpit currently evaluates leg-betting tiles from
-  the first die entered, treating setup as an action within the leg.
-- **Impact:** Expected coins and win probabilities are shown for a phase in
+  and offers no leg bets. The cockpit previously evaluated leg-betting tiles
+  from the first die entered, treating setup as an action within the leg.
+- **Impact:** Expected coins and win probabilities were shown for a phase in
   which taking a leg-bet tile is not available.
-- **Next step:** Model the setup phase in the shared game state: throw all five
+- ~~**Next step:** Model the setup phase in the shared game state: throw all five
   setup dice without coins, then suppress leg-bet values until setup is complete
-  and the board is fully placed. The cockpit's partial-board simulation now
-  averages over the setup stack orders RULES.md section 3 leaves to the players,
-  but it still evaluates a phase where leg bets would not be available.
+  and the board is fully placed.~~
+- **Status:** Resolved on `feat/setup-round`. The app marks snapshots taken
+  before the first leg with `setupRound`; the cockpit then returns
+  `legBet.available: false` with blank odds and the board's cards are disabled.
+  Setup ends when the first leg starts with *Next round*. The backend still
+  simulates partial boards for callers that do not mark a snapshot as setup.
 
 ### F-10 — Visual disabled state for exhausted board cards — P2
 
@@ -293,6 +296,6 @@ the race-finish work.
    excluded; B-04 is resolved).
 6. ~~**Clean up B-05** — cosmetic.~~ Already fixed in code before verification;
    only the stale roadmap entry was corrected.
-7. **Handle F-09 and F-10** — model the setup phase before trusting mid-leg
+7. ~~**Handle F-09 and F-10** — model the setup phase before trusting mid-leg
    values, and add the visual disabled state to the board's card stacks when the
-   UI is revisited.
+   UI is revisited.~~ F-09 is complete; F-10 remains open.

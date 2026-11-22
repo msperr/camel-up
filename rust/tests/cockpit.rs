@@ -173,6 +173,70 @@ fn dice_ticket_is_worth_one_and_empty_board_is_blank() {
 }
 
 #[test]
+fn setup_round_suppresses_leg_bet_values() {
+    let snapshot = request(json!({
+        "stacks": { "2": ["white"], "5": ["yellow", "orange"] },
+        "thrownDice": ["white", "yellow", "orange"],
+        "availableLegBets": all_tiles(5),
+        "setupRound": true,
+    }));
+
+    let result = evaluate_cockpit(&snapshot).expect("valid setup snapshot");
+
+    // The setup dice only place the camels: no leg bet can be taken yet.
+    assert_eq!(result.dice.expected_coins, 1.0);
+    assert!(!result.leg_bet.available);
+    assert_eq!(
+        colors(&result),
+        vec![
+            CamelColor::White,
+            CamelColor::Yellow,
+            CamelColor::Orange,
+            CamelColor::Green,
+            CamelColor::Blue,
+        ]
+    );
+    assert!(result
+        .leg_bet
+        .camels
+        .iter()
+        .all(|entry| entry.expected_coins.is_none() && entry.round_win_probability.is_none()));
+}
+
+#[tokio::test]
+async fn http_endpoint_marks_setup_leg_bets_unavailable() {
+    let response = app()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/cockpit/actions")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({
+                        "stacks": { "2": ["white"] },
+                        "thrownDice": ["white"],
+                        "availableLegBets": all_tiles(5),
+                        "setupRound": true,
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let value: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(value["legBet"]["available"], false);
+    let camels = value["legBet"]["camels"].as_array().unwrap();
+    assert_eq!(camels.len(), 5);
+    assert!(camels
+        .iter()
+        .all(|camel| camel["expectedCoins"].is_null() && camel["roundWinProbability"].is_null()));
+}
+
+#[test]
 fn partial_board_gives_stable_probabilities_from_the_first_die() {
     let snapshot = request(json!({
         "stacks": { "2": ["white"] },

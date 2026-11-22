@@ -6,6 +6,8 @@ type CockpitProps = {
   readonly error: string | null;
   /** Whether a pyramid ticket is still available to take this leg. */
   readonly diceAvailable?: boolean;
+  /** Whether a leg-betting tile can be taken (false throughout setup). */
+  readonly legBetAvailable?: boolean;
 };
 
 const formatCoins = (coins: number | null): string => (coins === null ? "" : coins.toFixed(2));
@@ -35,9 +37,15 @@ const camelsForEvaluation = (evaluation: CockpitResponse | null): readonly Camel
  * overall-bet rows are placeholders. The leg-betting values come from the Rust
  * backend, so an unavailable backend is reported here instead of silently
  * removing the camel columns. The ticket value is blanked once the leg is over
- * and no ticket can be taken.
+ * and no ticket can be taken. Leg-bet values are replaced by a placeholder
+ * throughout the setup round, when taking a tile is not an available action.
  */
-export default function Cockpit({ evaluation, error, diceAvailable = true }: CockpitProps) {
+export default function Cockpit({
+  evaluation,
+  error,
+  diceAvailable = true,
+  legBetAvailable = true,
+}: CockpitProps) {
   const camels = camelsForEvaluation(evaluation);
 
   return (
@@ -63,25 +71,29 @@ export default function Cockpit({ evaluation, error, diceAvailable = true }: Coc
         <span className="cockpit-placeholder">—</span>
       </div>
 
-      <div className="cockpit-row" data-action="legBet">
+      <div className="cockpit-row" data-action="legBet" data-leg-bet-available={legBetAvailable}>
         <span className="cockpit-label">Take a leg-betting tile</span>
-        <div className="cockpit-camels">
-          {camels.map(({ color, expectedCoins, roundWinProbability }) => (
-            <div
-              className={`cockpit-camel cockpit-camel--${color}`}
-              data-cockpit-camel={color}
-              key={color}
-            >
-              <span className="cockpit-swatch" aria-hidden="true" />
-              <span className="cockpit-coins" data-expected-coins>
-                {formatCoins(expectedCoins)}
-              </span>
-              <span className="cockpit-probability" data-win-probability>
-                {formatProbability(roundWinProbability)}
-              </span>
-            </div>
-          ))}
-        </div>
+        {legBetAvailable ? (
+          <div className="cockpit-camels">
+            {camels.map(({ color, expectedCoins, roundWinProbability }) => (
+              <div
+                className={`cockpit-camel cockpit-camel--${color}`}
+                data-cockpit-camel={color}
+                key={color}
+              >
+                <span className="cockpit-swatch" aria-hidden="true" />
+                <span className="cockpit-coins" data-expected-coins>
+                  {formatCoins(expectedCoins)}
+                </span>
+                <span className="cockpit-probability" data-win-probability>
+                  {formatProbability(roundWinProbability)}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <span className="cockpit-placeholder">—</span>
+        )}
       </div>
 
       <div className="cockpit-row" data-action="overall">

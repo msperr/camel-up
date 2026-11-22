@@ -16,6 +16,7 @@ const dice: readonly ThrownDie[] = [
 const responseBody: CockpitResponse = {
   dice: { expectedCoins: 1 },
   legBet: {
+    available: true,
     camels: [{ color: "white", expectedCoins: 2.5, roundWinProbability: 0.6 }],
   },
 };
@@ -32,27 +33,35 @@ describe("buildCockpitRequest", () => {
     };
     const legBets = { ...createLegBetState(), yellow: 2 };
 
-    expect(buildCockpitRequest(dice, race, legBets)).toEqual({
+    expect(buildCockpitRequest(dice, race, legBets, false)).toEqual({
       stacks: { "2": ["white"], "3": ["yellow", "orange"] },
       finished: null,
       thrownDice: ["white", "yellow"],
       availableLegBets: { white: 5, yellow: 3, orange: 5, green: 5, blue: 5 },
+      setupRound: false,
     });
   });
 
   it("sends a finished camel unit separately from the track", () => {
     const race: RaceState = { stacks: { 16: ["blue"] }, finished: ["white"] };
 
-    expect(buildCockpitRequest([], race, createLegBetState()).finished).toEqual(["white"]);
+    expect(buildCockpitRequest([], race, createLegBetState(), false).finished).toEqual(["white"]);
   });
 
   it("sends an empty board for the initial position", () => {
-    expect(buildCockpitRequest([], createRaceState(), createLegBetState())).toEqual({
+    expect(buildCockpitRequest([], createRaceState(), createLegBetState(), false)).toEqual({
       stacks: {},
       finished: null,
       thrownDice: [],
       availableLegBets: { white: 5, yellow: 5, orange: 5, green: 5, blue: 5 },
+      setupRound: false,
     });
+  });
+
+  it("marks the initial position as a setup round", () => {
+    expect(buildCockpitRequest([], createRaceState(), createLegBetState(), true).setupRound).toBe(
+      true,
+    );
   });
 });
 
@@ -63,7 +72,7 @@ describe("fetchCockpitEvaluation", () => {
       status: 200,
       json: async () => responseBody,
     } as Response);
-    const request = buildCockpitRequest(dice, createRaceState(), createLegBetState());
+    const request = buildCockpitRequest(dice, createRaceState(), createLegBetState(), false);
 
     await expect(fetchCockpitEvaluation(request)).resolves.toEqual(responseBody);
     expect(fetch).toHaveBeenCalledWith(
@@ -85,7 +94,7 @@ describe("fetchCockpitEvaluation", () => {
     const controller = new AbortController();
 
     await fetchCockpitEvaluation(
-      buildCockpitRequest([], createRaceState(), createLegBetState()),
+      buildCockpitRequest([], createRaceState(), createLegBetState(), false),
       controller.signal,
     );
 
@@ -96,7 +105,9 @@ describe("fetchCockpitEvaluation", () => {
     vi.mocked(fetch).mockResolvedValueOnce({ ok: false, status: 500 } as Response);
 
     await expect(
-      fetchCockpitEvaluation(buildCockpitRequest([], createRaceState(), createLegBetState())),
+      fetchCockpitEvaluation(
+        buildCockpitRequest([], createRaceState(), createLegBetState(), false),
+      ),
     ).rejects.toThrow(/Cockpit evaluation rejected \(HTTP 500\)/);
   });
 
@@ -108,7 +119,9 @@ describe("fetchCockpitEvaluation", () => {
     } as Response);
 
     await expect(
-      fetchCockpitEvaluation(buildCockpitRequest([], createRaceState(), createLegBetState())),
+      fetchCockpitEvaluation(
+        buildCockpitRequest([], createRaceState(), createLegBetState(), false),
+      ),
     ).rejects.toThrow(/HTTP 400\): space 0 must be in 1\.\.=16/);
   });
 
@@ -116,7 +129,9 @@ describe("fetchCockpitEvaluation", () => {
     vi.mocked(fetch).mockRejectedValueOnce(new TypeError("Failed to fetch"));
 
     await expect(
-      fetchCockpitEvaluation(buildCockpitRequest([], createRaceState(), createLegBetState())),
+      fetchCockpitEvaluation(
+        buildCockpitRequest([], createRaceState(), createLegBetState(), false),
+      ),
     ).rejects.toThrow(/start the Rust backend with 'cd rust && cargo run'/);
   });
 
@@ -128,7 +143,7 @@ describe("fetchCockpitEvaluation", () => {
 
     await expect(
       fetchCockpitEvaluation(
-        buildCockpitRequest([], createRaceState(), createLegBetState()),
+        buildCockpitRequest([], createRaceState(), createLegBetState(), false),
         controller.signal,
       ),
     ).rejects.toBe(abortError);

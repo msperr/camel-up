@@ -11,9 +11,14 @@
 //! When every camel is on the board, `p1`/`p2` come from the exhaustive
 //! [`State::simulate_outcomes`]. The temporary frontend board state can also
 //! contain camels that have not been placed yet; for those states a fixed-seed
-//! Monte Carlo simulation supplies the probabilities, so the cockpit works
-//! from the first die onwards. A completely empty board has no evaluable
-//! probabilities and every camel value is `null` (rendered as a blank field).
+//! Monte Carlo simulation supplies the probabilities. A completely empty board
+//! has no evaluable probabilities and every camel value is `null` (rendered as
+//! a blank field).
+//!
+//! During the setup round (RULES.md section 3) the five dice only place the
+//! camels and no leg bet may be taken. A snapshot marked `setupRound` therefore
+//! reports leg bets as unavailable and returns no leg-bet values, even though
+//! its partial-board probabilities can still be simulated for other callers.
 //!
 //! Snapshots must be internally consistent: every camel named in `thrownDice`
 //! must be on the board, and before all five camels are placed each camel on
@@ -85,6 +90,10 @@ pub struct CockpitRequest {
     /// colour's stack is exhausted.
     #[serde(default)]
     pub available_leg_bets: BTreeMap<CamelColor, Option<u8>>,
+    /// Whether the snapshot is still in the setup round, where the dice only
+    /// place the camels and taking a leg bet is not an available action.
+    #[serde(default)]
+    pub setup_round: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -103,6 +112,9 @@ pub struct DiceAction {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LegBetAction {
+    /// `false` during setup, when leg bets cannot be taken. The values are then
+    /// blank as well, so no coin expectation is shown for an illegal action.
+    pub available: bool,
     /// Already sorted by expected coins, then `p1`, then colour; exhausted
     /// stacks come last.
     pub camels: Vec<CamelOdds>,
@@ -125,6 +137,28 @@ pub struct CamelOdds {
 pub fn evaluate_cockpit(request: &CockpitRequest) -> Result<CockpitResponse, String> {
     let state = build_state(request)?;
     validate_snapshot(request, &state)?;
+
+    // Setup dice only place the camels: no leg-betting tile may be taken and
+    // there is no leg to score yet, so suppress every leg-bet value.
+    if request.setup_round {
+        return Ok(CockpitResponse {
+            dice: DiceAction {
+                expected_coins: PYRAMID_TICKET_EP,
+            },
+            leg_bet: LegBetAction {
+                available: false,
+                camels: CAMEL_ORDER
+                    .iter()
+                    .map(|&camel| CamelOdds {
+                        color: CamelColor::from_rules(camel),
+                        expected_coins: None,
+                        round_win_probability: None,
+                    })
+                    .collect(),
+            },
+        });
+    }
+
     let already_moved: Vec<Camel> = request
         .thrown_dice
         .iter()
@@ -186,7 +220,10 @@ pub fn evaluate_cockpit(request: &CockpitRequest) -> Result<CockpitResponse, Str
         dice: DiceAction {
             expected_coins: PYRAMID_TICKET_EP,
         },
-        leg_bet: LegBetAction { camels },
+        leg_bet: LegBetAction {
+            available: true,
+            camels,
+        },
     })
 }
 

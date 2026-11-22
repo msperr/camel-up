@@ -28,22 +28,25 @@ Single-page TypeScript frontend for the Camel Up decision tracker.
 - Above the track, five stacks of square leg-bet cards show each camel's 5, 3,
   and 2 tiles. Only the fully visible top tile is clickable; taking it reveals
   the next tile, and an exhausted stack leaves an empty, non-clickable outline.
-  Card clicks are disabled once five dice have been thrown or the race has
-  finished. Clear and Next round restore all three tiles for every camel.
+  Card clicks are disabled throughout the setup round (before the first leg),
+  once five dice have been thrown, or when the race has finished. Clear and
+  Next round restore all three tiles for every camel.
 - Below the board, a read-only cockpit lists the four actions using their names
   from RULES.md. “Take a pyramid ticket and roll” shows the ticket's guaranteed
   +1 EP with no camel columns while a ticket can still be taken; it shows a dash
   once all five dice are thrown or the race has finished. “Take a leg-betting
-  tile” shows one cell per camel with net expected EP (two decimals) and the
-  probability of winning the round (whole percent), ordered by expected coins,
-  then probability, then colour; an exhausted stack is blank and sorted last.
-  The desert and overall bet rows are placeholders. The cockpit has no controls.
+  tile” is a dash during setup; in a leg it shows one cell per camel with net
+  expected EP (two decimals) and the probability of winning the round (whole
+  percent), ordered by expected coins, then probability, then colour; an
+  exhausted stack is blank and sorted last. The desert and overall bet rows are
+  placeholders. The cockpit has no controls.
 - Expected values are computed by the Rust crate at `POST /api/cockpit/actions`;
   Vite proxies `/api` to `127.0.0.1:3000`. Run `cargo run` in `rust/` alongside
   `npm run dev`. Camel positions remain temporary local UI state for driving
   the SVG; the Rust crate remains the authoritative rules model. It rejects
-  board/dice combinations that cannot occur, and averages over the setup stack
-  orders left open by RULES.md section 3.
+  board/dice combinations that cannot occur, marks setup snapshots with
+  `setupRound` to suppress leg-bet values, and averages over the setup stack
+  orders left open by RULES.md section 3 for other callers.
 - Values are cleared while a new snapshot is being evaluated, so they never
   describe a different board. A validation failure shows the backend's message;
   only a network failure shows the instruction to start the Rust backend.

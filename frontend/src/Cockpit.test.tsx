@@ -6,6 +6,7 @@ import type { CockpitResponse } from "./cockpit";
 const evaluation: CockpitResponse = {
   dice: { expectedCoins: 1 },
   legBet: {
+    available: true,
     camels: [
       { color: "orange", expectedCoins: 2.345, roundWinProbability: 0.425 },
       { color: "white", expectedCoins: 1.2, roundWinProbability: 0.2 },
@@ -62,7 +63,7 @@ describe("Cockpit", () => {
   it("appends blank camels when an evaluation omits colours", () => {
     const partial: CockpitResponse = {
       ...evaluation,
-      legBet: { camels: [evaluation.legBet.camels[0]] },
+      legBet: { available: true, camels: [evaluation.legBet.camels[0]] },
     };
     const { container } = render(<Cockpit evaluation={partial} error={null} />);
 
@@ -96,6 +97,28 @@ describe("Cockpit", () => {
 
     expect(row).toHaveTextContent("—");
     expect(row).not.toHaveTextContent("1.00");
+  });
+
+  it("replaces leg-bet values with a placeholder during setup", () => {
+    const { container } = render(
+      <Cockpit evaluation={evaluation} error={null} legBetAvailable={false} />,
+    );
+    const row = getRow(container, "legBet");
+
+    expect(row).toHaveAttribute("data-leg-bet-available", "false");
+    expect(row).toHaveTextContent("Take a leg-betting tile");
+    expect(row).toHaveTextContent("—");
+    expect(row).not.toHaveTextContent("2.35");
+    expect(row?.querySelector("[data-cockpit-camel]")).not.toBeInTheDocument();
+  });
+
+  it("keeps the leg-bet values when taking a tile is available", () => {
+    const { container } = render(<Cockpit evaluation={evaluation} error={null} />);
+    const row = getRow(container, "legBet");
+
+    expect(row).toHaveAttribute("data-leg-bet-available", "true");
+    expect(row).toHaveTextContent("2.35");
+    expect(row?.querySelectorAll("[data-cockpit-camel]")).toHaveLength(5);
   });
 
   it("is read only", () => {

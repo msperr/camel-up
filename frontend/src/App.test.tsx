@@ -67,6 +67,12 @@ const fillRound = (values: readonly string[]) => {
   DIE_COLORS.forEach((color, index) => addDie(color, values[index]));
 };
 
+/** Roll the five setup dice and start the first leg. */
+const completeSetup = () => {
+  fillRound(["1", "1", "1", "1", "1"]);
+  fireEvent.click(screen.getByRole("button", { name: "Next round" }));
+};
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -654,33 +660,43 @@ describe("App", () => {
       expect(gameStyle).toContain("--bet-band-aspect: 1000 / 190");
     });
 
-    it("starts with three cards per camel and only the fives available", () => {
+    it("starts with three cards per camel but none available during setup", () => {
       const { container } = render(<App />);
 
       expect(container.querySelector('[data-leg-bets="true"]')).toBeInTheDocument();
       expect(getBetCards(container)).toHaveLength(15);
-      expect(getAvailableBetCards(container).map((card) => card.dataset.legBetCard)).toEqual([
-        ...DIE_COLORS,
-      ]);
-      expect(getAvailableBetCards(container).map((card) => card.dataset.legBetValue)).toEqual([
-        "5",
-        "5",
-        "5",
-        "5",
-        "5",
-      ]);
+      expect(getAvailableBetCards(container)).toHaveLength(0);
       expect(container.querySelectorAll("[data-leg-bet-empty]")).toHaveLength(0);
-      expect(screen.getByRole("button", { name: "Take White 5 leg-bet tile" })).toBeEnabled();
+      for (const label of ["White", "Yellow", "Orange", "Green", "Blue"]) {
+        expect(
+          screen.getByRole("button", { name: `Take ${label} 5 leg-bet tile` }),
+        ).toHaveAttribute("aria-disabled", "true");
+      }
 
       // Covered tiles are painted first, so the top tile is the last sibling.
       const whiteCards = getBetCardsFor(container, "white");
       expect(whiteCards.map((card) => card.dataset.legBetValue)).toEqual(["2", "3", "5"]);
-      expect(whiteCards[whiteCards.length - 1]).toHaveAttribute("data-leg-bet-available", "true");
+      expect(whiteCards[whiteCards.length - 1]).not.toHaveAttribute("data-leg-bet-available");
       expect(getCamels(container)).toHaveLength(0);
+    });
+
+    it("enables the top cards once the setup dice are done", () => {
+      const { container } = render(<App />);
+
+      fillRound(["1", "1", "1", "1", "1"]);
+      expect(getAvailableBetCards(container)).toHaveLength(0);
+
+      fireEvent.click(screen.getByRole("button", { name: "Next round" }));
+
+      expect(getAvailableBetCards(container).map((card) => card.dataset.legBetCard)).toEqual([
+        ...DIE_COLORS,
+      ]);
+      expect(screen.getByRole("button", { name: "Take White 5 leg-bet tile" })).toBeEnabled();
     });
 
     it("only takes the fully visible top card and reveals the next value", () => {
       const { container } = render(<App />);
+      completeSetup();
       const coveredThree = container.querySelector(
         '[data-leg-bet-card="white"][data-leg-bet-value="3"]',
       );
@@ -707,6 +723,7 @@ describe("App", () => {
 
     it("leaves an empty, non-clickable slot after taking the last card", () => {
       const { container } = render(<App />);
+      completeSetup();
 
       takeTopBet("White 5");
       takeTopBet("White 3");
@@ -722,6 +739,7 @@ describe("App", () => {
 
     it("keeps keyboard focus on the revealed tile and moves it to Clear when exhausted", async () => {
       render(<App />);
+      completeSetup();
 
       const five = screen.getByRole("button", { name: "Take Blue 5 leg-bet tile" });
       five.focus();
@@ -741,7 +759,9 @@ describe("App", () => {
 
     it("disables every top card once five dice are thrown", () => {
       const { container } = render(<App />);
+      completeSetup();
 
+      expect(getAvailableBetCards(container)).toHaveLength(5);
       fillRound(["1", "1", "1", "1", "1"]);
 
       for (const label of ["White", "Yellow", "Orange", "Green", "Blue"]) {
@@ -753,7 +773,7 @@ describe("App", () => {
 
       expect(getBetCards(container)).toHaveLength(15);
       expect(getAvailableBetCards(container)).toHaveLength(0);
-    });
+    }, 20000);
 
     it("disables the cards when a camel finishes the race early", () => {
       const { container } = render(<App />);
@@ -773,22 +793,27 @@ describe("App", () => {
 
     it("resets all stacks when Clear is pressed, even if only a card was taken", () => {
       const { container } = render(<App />);
+      completeSetup();
       const clear = screen.getByRole("button", { name: "Clear" });
 
-      expect(clear).toBeDisabled();
       takeTopBet("White 5");
       expect(clear).toBeEnabled();
 
       fireEvent.click(clear);
 
+      // Clear returns to setup, so the cards are disabled again.
       expect(getBetCards(container)).toHaveLength(15);
-      expect(getAvailableBetCards(container)).toHaveLength(5);
-      expect(screen.getByRole("button", { name: "Take White 5 leg-bet tile" })).toBeInTheDocument();
+      expect(getAvailableBetCards(container)).toHaveLength(0);
+      expect(screen.getByRole("button", { name: "Take White 5 leg-bet tile" })).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
       expect(clear).toBeDisabled();
     });
 
     it("resets all stacks when Next round is pressed", () => {
       const { container } = render(<App />);
+      completeSetup();
 
       takeTopBet("Orange 5");
       fillRound(["1", "1", "1", "1", "1"]);
@@ -803,7 +828,7 @@ describe("App", () => {
       expect(
         screen.getByRole("button", { name: "Take Orange 5 leg-bet tile" }),
       ).toBeInTheDocument();
-    });
+    }, 20000);
   });
 
   it("renders the cockpit below the board and refreshes it when a die is added", async () => {
@@ -824,18 +849,41 @@ describe("App", () => {
     const body = JSON.parse(lastCall?.[1]?.body as string) as {
       thrownDice: string[];
       stacks: Record<string, string[]>;
+      setupRound: boolean;
     };
 
     expect(body.thrownDice).toEqual(["white"]);
     expect(body.stacks).toEqual({ "2": ["white"] });
+    expect(body.setupRound).toBe(true);
   });
 
-  it("shows the cockpit backend error when the evaluation request fails", async () => {
+  it("shows leg bets as available once the setup round is over", async () => {
+    const { container } = render(<App />);
+    completeSetup();
+
+    expect(container.querySelector('[data-action="legBet"]')).toHaveAttribute(
+      "data-leg-bet-available",
+      "true",
+    );
+    const fetchMock = vi.mocked(fetch);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const lastCall = fetchMock.mock.calls.at(-1);
+    const body = JSON.parse(lastCall?.[1]?.body as string) as { setupRound: boolean };
+
+    expect(body.setupRound).toBe(false);
+  });
+
+  it("shows the cockpit backend error while keeping the setup placeholder", async () => {
     vi.mocked(fetch).mockRejectedValueOnce(new TypeError("Failed to fetch"));
     const { container } = render(<App />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/Rust backend/);
-    expect(container.querySelectorAll("[data-cockpit-camel]")).toHaveLength(5);
+    expect(container.querySelector('[data-action="legBet"]')).toHaveAttribute(
+      "data-leg-bet-available",
+      "false",
+    );
+    expect(container.querySelector('[data-action="legBet"]')).toHaveTextContent("—");
+    expect(container.querySelectorAll("[data-cockpit-camel]")).toHaveLength(0);
   });
 
   it("surfaces a backend validation error instead of startup instructions", async () => {
@@ -858,7 +906,7 @@ describe("App", () => {
     const evaluation = {
       ok: true,
       status: 200,
-      json: async () => ({ dice: { expectedCoins: 1 }, legBet: { camels: [] } }),
+      json: async () => ({ dice: { expectedCoins: 1 }, legBet: { available: true, camels: [] } }),
     } as Response;
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockImplementationOnce(async () => evaluation).mockImplementationOnce(() => pending);

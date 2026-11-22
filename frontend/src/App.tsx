@@ -323,6 +323,7 @@ export default function App() {
   const [dice, setDice] = useState<readonly ThrownDie[]>([]);
   const [race, setRace] = useState<RaceState>(createRaceState);
   const [legBets, setLegBets] = useState<LegBetState>(createLegBetState);
+  const [isSetupRound, setIsSetupRound] = useState(true);
   const [cockpit, setCockpit] = useState<CockpitResponse | null>(null);
   const [cockpitError, setCockpitError] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -341,7 +342,8 @@ export default function App() {
   const hasDice = dice.length > 0;
   const canAddDie = remainingColors.length > 0 && !raceFinished;
   const canStartNextRound = dice.length === MAX_DICE && !raceFinished;
-  const canTakeLegBet = dice.length < MAX_DICE && !raceFinished;
+  // Setup dice only place the camels; leg betting starts with the first leg.
+  const canTakeLegBet = !isSetupRound && dice.length < MAX_DICE && !raceFinished;
   const canClear = hasDice || camelsOnBoard || hasTakenLegBet(legBets);
 
   const defaultFocusTarget = (): FocusTarget =>
@@ -454,7 +456,10 @@ export default function App() {
     setCockpitError(null);
     setCockpit(null);
 
-    fetchCockpitEvaluation(buildCockpitRequest(dice, race, legBets), controller.signal)
+    fetchCockpitEvaluation(
+      buildCockpitRequest(dice, race, legBets, isSetupRound),
+      controller.signal,
+    )
       .then((evaluation) => {
         setCockpit(evaluation);
         setCockpitError(null);
@@ -469,7 +474,7 @@ export default function App() {
       });
 
     return () => controller.abort();
-  }, [dice, race, legBets]);
+  }, [dice, race, legBets, isSetupRound]);
 
   const randomizeDie = () => {
     if (remainingColors.length === 0) {
@@ -521,6 +526,7 @@ export default function App() {
     setDice([]);
     setRace(createRaceState());
     setLegBets(createLegBetState());
+    setIsSetupRound(true);
     setFocusAfterClose("add");
   };
 
@@ -531,6 +537,7 @@ export default function App() {
 
     setDice([]);
     setLegBets(createLegBetState());
+    setIsSetupRound(false);
     setFocusAfterClose("add");
   };
 
@@ -881,7 +888,12 @@ export default function App() {
             </div>
           </div>
 
-          <Cockpit evaluation={cockpit} error={cockpitError} diceAvailable={canAddDie} />
+          <Cockpit
+            evaluation={cockpit}
+            error={cockpitError}
+            diceAvailable={canAddDie}
+            legBetAvailable={canTakeLegBet}
+          />
 
           <div className="dice-controls" data-dice-controls="true">
             <button
