@@ -23,7 +23,8 @@ At a glance
 | Type | Wrong behaviour | Latent | Missing feature | Cosmetic | Total |
 |---|---:|---:|---:|---:|---:|
 | Bug | 0 | 0 | 0 | 0 | 0 |
-| Feature | 0 | 0 | 7 | 0 | 7 |
+| Feature | 0 | 0 | 8 | 0 | 8 |
+| Cosmetic | 0 | 0 | 0 | 1 | 1 |
 
 Resolved since the verification: **B-01, B-02, B-04, F-07**. B-05 was already
 correct in code; only its stale roadmap entry was fixed. B-03 is retained by
@@ -243,6 +244,31 @@ Features
 - **Next step:** Validate the dice range and the full desert invariant, or return
   a `Result` instead of panicking.
 
+### F-09 — Game setup phase and leg-bet availability — P1
+
+- **Type:** Feature
+- **Classification:** Missing feature
+- **Finding:** RULES.md section 3 rolls all five racing dice once during setup
+  to place the camels on spaces 1–3 before play begins. That phase pays no coins
+  and offers no leg bets. The cockpit currently evaluates leg-betting tiles from
+  the first die entered, treating setup as an action within the leg.
+- **Impact:** Expected coins and win probabilities are shown for a phase in
+  which taking a leg-bet tile is not available.
+- **Next step:** Model the setup phase in the shared game state: throw all five
+  setup dice without coins, then suppress leg-bet values until setup is complete
+  and the board is fully placed.
+
+### F-10 — Visual disabled state for exhausted board cards — P2
+
+- **Type:** Feature
+- **Classification:** Cosmetic
+- **Finding:** Exhausted leg-bet card stacks above the board use only an empty
+  dashed outline; the cards themselves have no explicit disabled appearance.
+- **Impact:** Players cannot see at a glance that a camel's cards are no longer
+  available.
+- **Next step:** Give the board's exhausted leg-bet card stacks a clear disabled
+  visual state. The cockpit is out of scope for this item.
+
 Suggested order
 ---------------
 B-01, B-02, B-04 and B-05 are complete on branch `fix/rust-core-bugs`. B-03 is
@@ -262,3 +288,6 @@ the race-finish work.
    excluded; B-04 is resolved).
 6. ~~**Clean up B-05** — cosmetic.~~ Already fixed in code before verification;
    only the stale roadmap entry was corrected.
+7. **Handle F-09 and F-10** — model the setup phase before trusting mid-leg
+   values, and add the visual disabled state to the board's card stacks when the
+   UI is revisited.

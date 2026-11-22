@@ -42,6 +42,8 @@ import {
   type LegBetState,
   type LegBetValue,
 } from "./legBets";
+import Cockpit from "./Cockpit";
+import { buildCockpitRequest, fetchCockpitEvaluation, type CockpitResponse } from "./cockpit";
 
 type DieStyle = {
   readonly label: string;
@@ -321,6 +323,7 @@ export default function App() {
   const [dice, setDice] = useState<readonly ThrownDie[]>([]);
   const [race, setRace] = useState<RaceState>(createRaceState);
   const [legBets, setLegBets] = useState<LegBetState>(createLegBetState);
+  const [cockpit, setCockpit] = useState<CockpitResponse | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedColor, setSelectedColor] = useState<CamelColor | "">("");
   const [selectedValue, setSelectedValue] = useState<DieValue | "">("");
@@ -443,6 +446,22 @@ export default function App() {
     target?.focus();
     setFocusAfterClose(null);
   }, [focusAfterClose, isDialogOpen]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetchCockpitEvaluation(buildCockpitRequest(dice, race, legBets), controller.signal)
+      .then(setCockpit)
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        console.error("Could not evaluate cockpit actions", error);
+        setCockpit(null);
+      });
+
+    return () => controller.abort();
+  }, [dice, race, legBets]);
 
   const randomizeDie = () => {
     if (remainingColors.length === 0) {
@@ -853,6 +872,8 @@ export default function App() {
               </button>
             </div>
           </div>
+
+          <Cockpit evaluation={cockpit} />
 
           <div className="dice-controls" data-dice-controls="true">
             <button

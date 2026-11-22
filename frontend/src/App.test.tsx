@@ -805,4 +805,28 @@ describe("App", () => {
       ).toBeInTheDocument();
     });
   });
+
+  it("renders the cockpit below the board and refreshes it when a die is added", async () => {
+    const { container } = render(<App />);
+    const board = container.querySelector<HTMLElement>(".board-stack");
+    const cockpit = container.querySelector<HTMLElement>('[data-cockpit="true"]');
+
+    expect(board).toBeInTheDocument();
+    expect(cockpit).toBeInTheDocument();
+    expect(board?.nextElementSibling).toBe(cockpit);
+
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockClear();
+    addDie("white", "2");
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const lastCall = fetchMock.mock.calls.at(-1);
+    const body = JSON.parse(lastCall?.[1]?.body as string) as {
+      thrownDice: string[];
+      stacks: Record<string, string[]>;
+    };
+
+    expect(body.thrownDice).toEqual(["white"]);
+    expect(body.stacks).toEqual({ "2": ["white"] });
+  });
 });
