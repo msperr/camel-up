@@ -460,65 +460,128 @@ impl State {
     pub fn evaluate_desert_placements(
         &self,
     ) -> std::collections::BTreeMap<u8, std::collections::BTreeMap<DesertTile, usize>> {
-        let mut result: std::collections::BTreeMap<
-            u8,
-            std::collections::BTreeMap<DesertTile, usize>,
-        > = std::collections::BTreeMap::new();
+        self.simulate_desert_hits(&[]).0
+    }
 
+    /// Expected direct income from placing a desert tile on each legal space
+    /// for the rest of the current leg: 1 EP per camel unit that ends a move on
+    /// the tile (RULES.md section 6).
+    ///
+    /// `already_moved` lists the camels whose dice have already been revealed;
+    /// only the remaining moves are simulated. The denominator is the number of
+    /// simulated permutations times die-roll products, matching
+    /// [`State::simulate_outcomes`]. Tiles already on the board stay there, so
+    /// their effects are included.
+    ///
+    /// Returns an empty map when the race is finished, the board has no camels,
+    /// or the leg is over (all five dice revealed). As with
+    /// [`State::simulate_outcomes`], all five camels must be on the board.
+    pub fn expected_desert_income(
+        &self,
+        already_moved: &[Camel],
+    ) -> std::collections::BTreeMap<u8, std::collections::BTreeMap<DesertTile, f64>> {
+        let (hits, total) = self.simulate_desert_hits(already_moved);
+        if total == 0 {
+            return std::collections::BTreeMap::new();
+        }
+        hits.into_iter()
+            .map(|(space, per_tile)| {
+                (
+                    space,
+                    per_tile
+                        .into_iter()
+                        .map(|(tile, count)| (tile, count as f64 / total as f64))
+                        .collect(),
+                )
+            })
+            .collect()
+    }
+
+    /// Whether a tile may legally be placed on `space`: never space 1, never an
+    /// occupied space, and never next to another desert (RULES.md section 6).
+    fn is_legal_desert_placement(&self, space: u8) -> bool {
+        if space == 1 || space > MAX_FIELD || self.data.contains_key(&space) {
+            return false;
+        }
+        if space
+            .checked_sub(1)
+            .map(|left| matches!(self.data.get(&left), Some(Space::Desert(_))))
+            .unwrap_or(false)
+        {
+            return false;
+        }
+        if space
+            .checked_add(1)
+            .map(|right| matches!(self.data.get(&right), Some(Space::Desert(_))))
+            .unwrap_or(false)
+        {
+            return false;
+        }
+        true
+    }
+
+    /// Legal desert spaces, starting at the rearmost camel. Camel positions
+    /// never decrease across a move, so spaces behind it cannot earn income.
+    pub(crate) fn legal_desert_spaces(&self) -> Vec<u8> {
         if self.is_finished() || self.data.is_empty() {
-            return result;
+            return Vec::new();
         }
 
         // Start from the rearmost camel, not the lowest occupied key: an
         // existing desert behind it is inert and must not widen the range.
-        let min_key = match self
+        let Some(min_key) = self
             .data
             .iter()
             .filter_map(|(&key, space)| matches!(space, Space::Camels(_)).then_some(key))
             .min()
-        {
-            Some(key) => key,
-            None => return result,
+        else {
+            return Vec::new();
         };
-        let bound = MAX_FIELD;
 
-        for pos in min_key..=bound {
-            // A desert tile may never be placed on space 1 (RULES.md section 6).
-            if pos == 1 {
-                continue;
-            }
+        (min_key..=MAX_FIELD)
+            .filter(|&space| self.is_legal_desert_placement(space))
+            .collect()
+    }
+
+    /// Simulate each legal placement, returning hit counts per space and tile
+    /// together with the scenario count used as the expected-value denominator.
+    fn simulate_desert_hits(
+        &self,
+        already_moved: &[Camel],
+    ) -> (
+        std::collections::BTreeMap<u8, std::collections::BTreeMap<DesertTile, usize>>,
+        usize,
+    ) {
+        let mut result: std::collections::BTreeMap<
+            u8,
+            std::collections::BTreeMap<DesertTile, usize>,
+        > = std::collections::BTreeMap::new();
+        let mut total = 0usize;
+
+        if already_moved.len() >= 5 {
+            return (result, total);
+        }
+
+        for pos in self.legal_desert_spaces() {
             for &tile in &[DesertTile::Oasis, DesertTile::Mirage] {
-                // feasibility: cannot place on camels or on an existing desert
-                match self.data.get(&pos) {
-                    Some(Space::Camels(_)) => continue,
-                    Some(Space::Desert(_)) => continue,
-                    _ => {}
-                }
-
-                // adjacent left desert?
-                if let Some(left) = pos.checked_sub(1) {
-                    if let Some(Space::Desert(_)) = self.data.get(&left) {
-                        continue;
-                    }
-                }
-                // adjacent right desert?
-                if let Some(right) = pos.checked_add(1) {
-                    if let Some(Space::Desert(_)) = self.data.get(&right) {
-                        continue;
-                    }
-                }
-
-                // create clone with desert at pos
+                // create clone with desert at pos; existing tiles remain
                 let mut clone_map = self.data.clone();
                 clone_map.insert(pos, Space::Desert(tile));
                 let clone_state = State::new(clone_map);
 
-                let (_camel_counts, desert_counts) = clone_state.simulate_outcomes(&[]);
-                let hits = desert_counts.get(&pos).cloned().unwrap_or(0usize);
+                let (camel_counts, desert_counts) = clone_state.simulate_outcomes(already_moved);
+                if total == 0 {
+                    total = camel_counts
+                        .values()
+                        .next()
+                        .map(|positions| positions.iter().sum())
+                        .unwrap_or(0);
+                }
+                let hits = desert_counts.get(&pos).copied().unwrap_or(0usize);
                 result.entry(pos).or_default().insert(tile, hits);
             }
         }
 
-        result
+        (result, total)
     }
 }

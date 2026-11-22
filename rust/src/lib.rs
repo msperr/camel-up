@@ -6,8 +6,8 @@ pub mod simulation;
 pub mod state;
 
 pub use cockpit::{
-    evaluate_cockpit, CamelColor, CamelOdds, CockpitRequest, CockpitResponse, DiceAction,
-    LegBetAction, PYRAMID_TICKET_EP,
+    evaluate_cockpit, CamelColor, CamelOdds, CockpitRequest, CockpitResponse, DesertAction,
+    DesertKind, DesertOption, DiceAction, LegBetAction, PlacedDesert, PYRAMID_TICKET_EP,
 };
 pub use combinatorics::{Permutations, Product};
 pub use leg_bets::{expected_leg_bet_coins, AvailableLegBets};
