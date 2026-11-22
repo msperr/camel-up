@@ -1,10 +1,12 @@
 use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
 use camel_up::api::app;
-use camel_up::cockpit::{evaluate_cockpit, CamelColor, CockpitRequest, CockpitResponse};
+use camel_up::cockpit::{
+    evaluate_cockpit, CamelColor, CockpitRequest, CockpitResponse, DesertKind,
+};
 use camel_up::leg_bets::{expected_leg_bet_coins, AvailableLegBets};
 use camel_up::simulation::CAMEL_ORDER;
-use camel_up::{Camel, Space, State};
+use camel_up::{Camel, DesertTile, Space, State};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use tower::ServiceExt;
@@ -508,4 +510,258 @@ async fn http_endpoint_rejects_an_inconsistent_dice_list() {
     .await;
 
     assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+/// Only blue's die is still in the pyramid: from space 9 its three possible
+/// rolls land on 10, 11 and 12, giving exact 1/3 incomes there.
+fn pending_blue_snapshot() -> Value {
+    json!({
+        "stacks": {
+            "2": ["yellow"], "3": ["orange"], "5": ["white"],
+            "7": ["green"], "9": ["blue"]
+        },
+        "thrownDice": ["white", "yellow", "orange", "green"],
+        "availableLegBets": all_tiles(5),
+    })
+}
+
+fn pending_blue_state() -> State {
+    State::new(BTreeMap::from([
+        (2, Space::Camels(vec![Camel::Yellow])),
+        (3, Space::Camels(vec![Camel::Orange])),
+        (5, Space::Camels(vec![Camel::White])),
+        (7, Space::Camels(vec![Camel::Green])),
+        (9, Space::Camels(vec![Camel::Blue])),
+    ]))
+}
+
+#[test]
+fn deserts_deserialise_and_default_to_empty() {
+    let mut with_tiles = pending_blue_snapshot();
+    with_tiles["deserts"] = json!([
+        { "space": 8, "kind": "oasis" },
+        { "space": 11, "kind": "mirage" }
+    ]);
+    let snapshot = request(with_tiles);
+
+    assert_eq!(snapshot.deserts.len(), 2);
+    assert_eq!(snapshot.deserts[0].space, 8);
+    assert_eq!(snapshot.deserts[0].kind, DesertKind::Oasis);
+    assert_eq!(snapshot.deserts[1].space, 11);
+    assert_eq!(snapshot.deserts[1].kind, DesertKind::Mirage);
+    assert!(request(pending_blue_snapshot()).deserts.is_empty());
+}
+
+#[test]
+fn desert_options_have_exact_coins_and_expected_ordering() {
+    let result = evaluate_cockpit(&request(pending_blue_snapshot())).expect("valid snapshot");
+    let options = &result.desert.options;
+
+    // Ten legal spaces x two faces; the three reachable spaces come first.
+    assert_eq!(options.len(), 20);
+    let top: Vec<(u8, DesertKind, f64)> = options[..6]
+        .iter()
+        .map(|option| (option.space, option.kind, option.expected_coins))
+        .collect();
+    assert_eq!(
+        top,
+        vec![
+            (10, DesertKind::Oasis, 1.0 / 3.0),
+            (10, DesertKind::Mirage, 1.0 / 3.0),
+            (11, DesertKind::Oasis, 1.0 / 3.0),
+            (11, DesertKind::Mirage, 1.0 / 3.0),
+            (12, DesertKind::Oasis, 1.0 / 3.0),
+            (12, DesertKind::Mirage, 1.0 / 3.0),
+        ]
+    );
+    assert!(options[6..]
+        .iter()
+        .all(|option| option.expected_coins == 0.0));
+
+    let spaces: Vec<u8> = options[6..].iter().map(|option| option.space).collect();
+    assert_eq!(
+        spaces,
+        vec![4, 4, 6, 6, 8, 8, 13, 13, 14, 14, 15, 15, 16, 16]
+    );
+}
+
+#[test]
+fn desert_income_matches_exhaustive_simulation_with_existing_tiles() {
+    let mut snapshot = pending_blue_snapshot();
+    snapshot["thrownDice"] = json!(["white", "yellow", "orange"]);
+    snapshot["deserts"] = json!([{ "space": 11, "kind": "oasis" }]);
+
+    let mut data = pending_blue_state().data;
+    data.insert(11, Space::Desert(DesertTile::Oasis));
+    let mut with_candidate = data.clone();
+    with_candidate.insert(8, Space::Desert(DesertTile::Oasis));
+
+    let (counts, hits) =
+        State::new(with_candidate).simulate_outcomes(&[Camel::White, Camel::Yellow, Camel::Orange]);
+    let total: usize = counts[&Camel::White].iter().sum();
+    let expected = hits.get(&8).copied().unwrap_or(0) as f64 / total as f64;
+
+    let result = evaluate_cockpit(&request(snapshot)).expect("valid snapshot");
+    let option = result
+        .desert
+        .options
+        .iter()
+        .find(|option| option.space == 8 && option.kind == DesertKind::Oasis)
+        .expect("space 8 is legal");
+    assert!(
+        (option.expected_coins - expected).abs() < 1e-12,
+        "got {}, expected {}",
+        option.expected_coins,
+        expected
+    );
+}
+
+#[test]
+fn desert_options_skip_occupied_and_adjacent_spaces() {
+    let mut snapshot = pending_blue_snapshot();
+    snapshot["deserts"] = json!([{ "space": 8, "kind": "mirage" }]);
+
+    let result = evaluate_cockpit(&request(snapshot)).expect("valid snapshot");
+    let spaces: BTreeMap<u8, usize> =
+        result
+            .desert
+            .options
+            .iter()
+            .fold(BTreeMap::new(), |mut acc, option| {
+                *acc.entry(option.space).or_insert(0) += 1;
+                acc
+            });
+
+    // Tile on 8 forbids 7, 8 and 9; the camels occupy 2, 3, 5, 7 and 9.
+    assert_eq!(
+        spaces.keys().copied().collect::<Vec<_>>(),
+        vec![4, 6, 10, 11, 12, 13, 14, 15, 16]
+    );
+    assert!(spaces.values().all(|&count| count == 2));
+}
+
+#[test]
+fn desert_options_are_empty_at_leg_end_and_after_the_finish() {
+    let mut leg_end = pending_blue_snapshot();
+    leg_end["thrownDice"] = json!(["white", "yellow", "orange", "green", "blue"]);
+    assert!(evaluate_cockpit(&request(leg_end))
+        .expect("valid snapshot")
+        .desert
+        .options
+        .is_empty());
+
+    let finished = request(json!({
+        "stacks": {
+            "2": ["yellow"], "3": ["orange"], "5": ["white"], "7": ["green"]
+        },
+        "finished": ["blue"],
+        "thrownDice": ["white", "yellow", "orange", "green"],
+        "availableLegBets": all_tiles(5),
+    }));
+    assert!(evaluate_cockpit(&finished)
+        .expect("valid snapshot")
+        .desert
+        .options
+        .is_empty());
+
+    let empty = request(json!({
+        "stacks": {},
+        "thrownDice": [],
+        "availableLegBets": all_tiles(5),
+    }));
+    assert!(evaluate_cockpit(&empty)
+        .expect("valid snapshot")
+        .desert
+        .options
+        .is_empty());
+}
+
+#[test]
+fn setup_round_has_no_desert_options() {
+    let mut setup = pending_blue_snapshot();
+    setup["setupRound"] = json!(true);
+
+    let result = evaluate_cockpit(&request(setup)).expect("valid setup snapshot");
+    assert!(result.desert.options.is_empty());
+    assert_eq!(result.dice.expected_coins, None);
+    assert!(!result.leg_bet.available);
+}
+
+#[test]
+fn partial_board_desert_options_are_deterministic() {
+    let snapshot = request(json!({
+        "stacks": { "2": ["white"] },
+        "thrownDice": ["white"],
+        "availableLegBets": all_tiles(5),
+    }));
+
+    let first = evaluate_cockpit(&snapshot).expect("valid snapshot");
+    let second = evaluate_cockpit(&snapshot).expect("valid snapshot");
+
+    assert_eq!(first.desert.options, second.desert.options);
+    assert!(!first.desert.options.is_empty());
+}
+
+#[tokio::test]
+async fn http_endpoint_rejects_invalid_deserts() {
+    let invalid = [
+        json!({ "space": 1, "kind": "oasis" }),
+        json!({ "space": 0, "kind": "oasis" }),
+        json!({ "space": 17, "kind": "oasis" }),
+        json!({ "space": 5, "kind": "oasis" }), // camel
+    ];
+    for desert in invalid {
+        let mut snapshot = pending_blue_snapshot();
+        snapshot["deserts"] = json!([desert]);
+        assert_eq!(post(snapshot).await, StatusCode::BAD_REQUEST, "{desert}");
+    }
+
+    let mut duplicate = pending_blue_snapshot();
+    duplicate["deserts"] = json!([
+        { "space": 11, "kind": "oasis" },
+        { "space": 11, "kind": "mirage" }
+    ]);
+    assert_eq!(post(duplicate).await, StatusCode::BAD_REQUEST);
+
+    let mut adjacent = pending_blue_snapshot();
+    adjacent["deserts"] = json!([
+        { "space": 11, "kind": "oasis" },
+        { "space": 12, "kind": "mirage" }
+    ]);
+    assert_eq!(post(adjacent).await, StatusCode::BAD_REQUEST);
+
+    // Unknown JSON enum values are rejected by serde before the handler runs.
+    let mut bad_kind = pending_blue_snapshot();
+    bad_kind["deserts"] = json!([{ "space": 10, "kind": "volcano" }]);
+    assert_eq!(post(bad_kind).await, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn http_endpoint_returns_sorted_desert_options_and_accepts_legacy_requests() {
+    let mut snapshot = pending_blue_snapshot();
+    snapshot["deserts"] = json!([{ "space": 8, "kind": "oasis" }]);
+    let response = app()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/cockpit/actions")
+                .header("content-type", "application/json")
+                .body(Body::from(snapshot.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let value: Value = serde_json::from_slice(&body).unwrap();
+    let options = value["desert"]["options"]
+        .as_array()
+        .expect("options array");
+    assert_eq!(options[0]["space"], 10);
+    assert_eq!(options[0]["kind"], "oasis");
+    assert!((options[0]["expectedCoins"].as_f64().unwrap() - 1.0 / 3.0).abs() < 1e-12);
+    assert!(!options.iter().any(|option| option["space"] == 8));
+
+    let legacy = post(pending_blue_snapshot()).await;
+    assert_eq!(legacy, StatusCode::OK);
 }
