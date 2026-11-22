@@ -1,7 +1,22 @@
+use crate::simulation::CAMEL_ORDER;
 use std::collections::BTreeMap;
 
 /// Highest numbered space on the race track (inclusive). Crossing it ends the race.
 pub const MAX_FIELD: u8 = 16;
+
+/// Track spaces plus the off-board spaces a dice move from space 16 can reach.
+const BOARD_SPACES: usize = MAX_FIELD as usize + 4;
+
+fn camel_index(camel: Camel) -> usize {
+    CAMEL_ORDER
+        .iter()
+        .position(|&c| c == camel)
+        .expect("camel must be one of the five racing camels")
+}
+
+fn camel_from_index(index: usize) -> Camel {
+    CAMEL_ORDER[index]
+}
 
 /// Camel colors
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -46,6 +61,155 @@ pub struct State {
     /// [`MAX_FIELD`] hold camel units that have crossed the finish line; they
     /// are an off-board representation, not additional track spaces.
     pub data: BTreeMap<u8, Space>,
+}
+
+/// Compact, heap-free board used by the exhaustive simulators.
+///
+/// Every move in [`State::move_unit`] clones the whole `BTreeMap` and the
+/// touched stack `Vec`s. A leg simulation repeats that millions of times, so
+/// this representation keeps the five camel stacks and the desert tiles in
+/// fixed-size arrays. Cloning a board is then a few dozen bytes of stack copy,
+/// and a move never allocates. The rules behaviour is identical to `move_unit`
+/// (the equivalence tests at the bottom of this module pin that down).
+#[derive(Clone)]
+struct FastBoard {
+    /// Camel indices (bottom to top) at each space; only `lengths[space]`
+    /// entries are meaningful. Indices above `MAX_FIELD` hold finished units.
+    stacks: [[u8; 5]; BOARD_SPACES],
+    lengths: [u8; BOARD_SPACES],
+    /// Current space of each camel index, for O(1) source lookup.
+    positions: [u8; 5],
+    deserts: [Option<DesertTile>; MAX_FIELD as usize + 1],
+    finished: bool,
+}
+
+impl FastBoard {
+    fn from_state(state: &State) -> Self {
+        let mut board = Self {
+            stacks: [[0; 5]; BOARD_SPACES],
+            lengths: [0; BOARD_SPACES],
+            positions: [0; 5],
+            deserts: [None; MAX_FIELD as usize + 1],
+            finished: state.is_finished(),
+        };
+        for (&space, cell) in &state.data {
+            let index = space as usize;
+            match cell {
+                Space::Camels(camels) => {
+                    for &camel in camels {
+                        let ci = camel_index(camel);
+                        let len = board.lengths[index] as usize;
+                        board.stacks[index][len] = ci as u8;
+                        board.lengths[index] = (len + 1) as u8;
+                        board.positions[ci] = space;
+                    }
+                }
+                Space::Desert(tile) => {
+                    if index <= MAX_FIELD as usize {
+                        board.deserts[index] = Some(*tile);
+                    }
+                }
+            }
+        }
+        board
+    }
+
+    fn append(&mut self, space: usize, unit: &[u8]) {
+        debug_assert!(space < BOARD_SPACES);
+        let len = self.lengths[space] as usize;
+        for (offset, &camel) in unit.iter().enumerate() {
+            self.stacks[space][len + offset] = camel;
+            self.positions[camel as usize] = space as u8;
+        }
+        self.lengths[space] = (len + unit.len()) as u8;
+    }
+
+    fn prepend(&mut self, space: usize, unit: &[u8]) {
+        debug_assert!(space < BOARD_SPACES);
+        let len = self.lengths[space] as usize;
+        for index in (0..len).rev() {
+            self.stacks[space][index + unit.len()] = self.stacks[space][index];
+        }
+        for (offset, &camel) in unit.iter().enumerate() {
+            self.stacks[space][offset] = camel;
+            self.positions[camel as usize] = space as u8;
+        }
+        self.lengths[space] = (len + unit.len()) as u8;
+    }
+
+    fn assert_no_adjacent_desert(&self, space: usize, neighbour: usize) {
+        if self.deserts.get(neighbour).copied().flatten().is_some() {
+            panic!(
+                "precondition violated: desert at {} adjacent to desert at {}",
+                space, neighbour
+            );
+        }
+    }
+
+    /// Move one camel unit. Returns the desert space when a tile was triggered.
+    fn move_unit(&mut self, camel: Camel, steps: u8) -> Option<u8> {
+        let ci = camel_index(camel);
+        let source = self.positions[ci] as usize;
+        let index_in_stack = (0..self.lengths[source] as usize)
+            .find(|&index| self.stacks[source][index] as usize == ci)
+            .expect("camel must be present in its recorded stack");
+        let top = self.lengths[source] as usize;
+        let unit_len = top - index_in_stack;
+        let mut unit = [0u8; 5];
+        unit[..unit_len].copy_from_slice(&self.stacks[source][index_in_stack..top]);
+        self.lengths[source] = index_in_stack as u8;
+
+        let destination = source as u8 + steps;
+        let tile = if destination <= MAX_FIELD {
+            self.deserts[destination as usize]
+        } else {
+            None
+        };
+        let oasis_at_destination = tile == Some(DesertTile::Oasis);
+        let crosses_finish =
+            destination > MAX_FIELD || (destination == MAX_FIELD && oasis_at_destination);
+
+        if crosses_finish {
+            let finish_space = if oasis_at_destination {
+                destination as usize + 1
+            } else {
+                destination as usize
+            };
+            self.append(finish_space, &unit[..unit_len]);
+            self.finished = true;
+            return oasis_at_destination.then_some(destination);
+        }
+
+        let hit = tile.map(|_| destination);
+        match tile {
+            None => self.append(destination as usize, &unit[..unit_len]),
+            Some(DesertTile::Oasis) => {
+                let forward = destination as usize + 1;
+                self.assert_no_adjacent_desert(destination as usize, forward);
+                self.append(forward, &unit[..unit_len]);
+            }
+            Some(DesertTile::Mirage) => {
+                let back = (destination as usize)
+                    .checked_sub(1)
+                    .expect("a mirage can never be reached from space 0");
+                self.assert_no_adjacent_desert(destination as usize, back);
+                self.prepend(back, &unit[..unit_len]);
+            }
+        }
+        hit
+    }
+
+    /// Race order: most advanced space first, then stack top to bottom.
+    fn ranking(&self) -> Vec<Camel> {
+        let mut ranking = Vec::with_capacity(CAMEL_ORDER.len());
+        for space in (0..BOARD_SPACES).rev() {
+            let length = self.lengths[space] as usize;
+            for index in (0..length).rev() {
+                ranking.push(camel_from_index(self.stacks[space][index] as usize));
+            }
+        }
+        ranking
+    }
 }
 
 impl State {
@@ -336,19 +500,16 @@ impl State {
         std::collections::BTreeMap<Camel, Vec<usize>>,
         std::collections::BTreeMap<u8, usize>,
     ) {
-        use crate::combinatorics::{Permutations, Product};
+        let remaining = self.validate_simulation_input(already_moved);
+        self.simulate_outcomes_fast(&remaining)
+    }
 
+    /// Check the preconditions shared by [`State::simulate_outcomes`] and the
+    /// desert evaluators, and return the camels still to be moved.
+    fn validate_simulation_input(&self, already_moved: &[Camel]) -> Vec<Camel> {
         if self.is_finished() {
             panic!("simulate_outcomes: the race has already finished");
         }
-
-        let camel_list = vec![
-            Camel::White,
-            Camel::Yellow,
-            Camel::Orange,
-            Camel::Green,
-            Camel::Blue,
-        ];
 
         // Reject duplicate entries: each camel's die can only be revealed once
         // per leg.
@@ -362,7 +523,7 @@ impl State {
         }
 
         // Preconditions: every Camel must appear exactly once in self.data
-        for &camel in &camel_list {
+        for &camel in &CAMEL_ORDER {
             let occurrences: usize = self
                 .data
                 .values()
@@ -381,7 +542,7 @@ impl State {
 
         // A leg is over as soon as the last camel has moved: the dice go back
         // into the pyramid and there is nothing left to simulate.
-        let remaining: Vec<Camel> = camel_list
+        let remaining: Vec<Camel> = CAMEL_ORDER
             .iter()
             .copied()
             .filter(|camel| !already_moved.contains(camel))
@@ -391,38 +552,66 @@ impl State {
                 "simulate_outcomes: all camels have already moved; the leg is over and there are no outcomes left to simulate"
             );
         }
+        remaining
+    }
 
-        let num_camels = camel_list.len();
-        let num_remaining = remaining.len();
-        let choices: Vec<u8> = vec![1, 2, 3];
+    /// Exhaustive simulation over an allocation-light board. `remaining` is the
+    /// validated list of camels whose dice are still in the pyramid.
+    fn simulate_outcomes_fast(
+        &self,
+        remaining: &[Camel],
+    ) -> (
+        std::collections::BTreeMap<Camel, Vec<usize>>,
+        std::collections::BTreeMap<u8, usize>,
+    ) {
+        use crate::combinatorics::{Permutations, Product};
 
-        let mut counts = std::collections::BTreeMap::new();
-        for &c in &camel_list {
-            counts.insert(c, vec![0usize; num_camels]);
-        }
-
+        let base = FastBoard::from_state(self);
+        let choices = vec![1u8, 2, 3];
+        let mut counts: std::collections::BTreeMap<Camel, Vec<usize>> = CAMEL_ORDER
+            .iter()
+            .map(|&camel| (camel, vec![0usize; CAMEL_ORDER.len()]))
+            .collect();
         let mut desert_counts: std::collections::BTreeMap<u8, usize> =
             std::collections::BTreeMap::new();
 
-        for perm in Permutations::new(remaining) {
-            for comb in Product::new(choices.clone(), num_remaining) {
-                // Avoid allocating a Vec for each permutation+combination by passing the
-                // zipped iterator directly. `move_multiple_units` accepts any IntoIterator.
-                let (result, counts_map) = self.move_multiple_units(perm.iter().cloned().zip(comb));
-                let ranking = result.ranking();
-                for (pos, &camel) in ranking.iter().enumerate() {
-                    if let Some(v) = counts.get_mut(&camel) {
-                        v[pos] += 1;
+        for perm in Permutations::new(remaining.iter().copied()) {
+            for dice in Product::new(choices.clone(), remaining.len()) {
+                let mut board = base.clone();
+                for (&camel, &steps) in perm.iter().zip(dice.iter()) {
+                    if board.finished {
+                        break;
+                    }
+                    if let Some(space) = board.move_unit(camel, steps) {
+                        *desert_counts.entry(space).or_insert(0) += 1;
                     }
                 }
-                // accumulate desert hit counts per position
-                for (k, &v) in &counts_map {
-                    *desert_counts.entry(*k).or_insert(0) += v;
+                for (position, &camel) in board.ranking().iter().enumerate() {
+                    counts.get_mut(&camel).expect("all camels are tracked")[position] += 1;
                 }
             }
         }
 
         (counts, desert_counts)
+    }
+
+    /// Desert hit counts for a concrete move sequence, using the fast board.
+    /// Used by the cockpit's sampled partial-board evaluator.
+    pub(crate) fn simulate_moves_hits<I>(&self, moves: I) -> BTreeMap<u8, usize>
+    where
+        I: IntoIterator<Item = (Camel, u8)>,
+    {
+        let mut board = FastBoard::from_state(self);
+        let mut counts = BTreeMap::new();
+        for (camel, steps) in moves {
+            if board.finished {
+                break;
+            }
+            if let Some(space) = board.move_unit(camel, steps) {
+                *counts.entry(space).or_insert(0) += 1;
+            }
+        }
+        counts
     }
 
     /// Return all camels flattened by board position (rear to front), then by
@@ -545,6 +734,12 @@ impl State {
 
     /// Simulate each legal placement, returning hit counts per space and tile
     /// together with the scenario count used as the expected-value denominator.
+    ///
+    /// Every candidate needs its own simulation pass: a tile changes where the
+    /// camel that hits it ends up, and when that camel shares a stack with an
+    /// unmoved camel it can change the latter's landing space too. Recording
+    /// landings once on a tile-free board would therefore undercount hits such
+    /// as a stacked camel returning to a mirage (`mirage_carries_a_stacked_camel_back_onto_the_tile`).
     fn simulate_desert_hits(
         &self,
         already_moved: &[Camel],
@@ -558,30 +753,298 @@ impl State {
         > = std::collections::BTreeMap::new();
         let mut total = 0usize;
 
-        if already_moved.len() >= 5 {
+        if already_moved.len() >= CAMEL_ORDER.len() {
             return (result, total);
         }
 
-        for pos in self.legal_desert_spaces() {
-            for &tile in &[DesertTile::Oasis, DesertTile::Mirage] {
-                // create clone with desert at pos; existing tiles remain
-                let mut clone_map = self.data.clone();
-                clone_map.insert(pos, Space::Desert(tile));
-                let clone_state = State::new(clone_map);
+        let candidates: Vec<(u8, DesertTile)> = self
+            .legal_desert_spaces()
+            .into_iter()
+            .flat_map(|space| [(space, DesertTile::Oasis), (space, DesertTile::Mirage)])
+            .collect();
+        if candidates.is_empty() {
+            return (result, total);
+        }
 
-                let (camel_counts, desert_counts) = clone_state.simulate_outcomes(already_moved);
-                if total == 0 {
-                    total = camel_counts
-                        .values()
-                        .next()
-                        .map(|positions| positions.iter().sum())
-                        .unwrap_or(0);
-                }
-                let hits = desert_counts.get(&pos).copied().unwrap_or(0usize);
-                result.entry(pos).or_default().insert(tile, hits);
+        // The candidate boards are independent, so spread them over OS threads.
+        // Each thread reuses the same permutation/dice enumeration for its
+        // candidates and never allocates during a scenario.
+        let remaining = self.validate_simulation_input(already_moved);
+        let remaining_ref = &remaining;
+        let threads = std::thread::available_parallelism()
+            .map(|count| count.get())
+            .unwrap_or(1)
+            .min(candidates.len())
+            .max(1);
+        let chunk_size = candidates.len().div_ceil(threads);
+
+        let evaluated: Vec<(u8, DesertTile, usize, usize)> = std::thread::scope(|scope| {
+            let handles: Vec<_> = candidates
+                .chunks(chunk_size)
+                .map(|chunk| {
+                    scope.spawn(move || {
+                        let mut evaluated = Vec::with_capacity(chunk.len());
+                        for &(space, tile) in chunk {
+                            let mut board = self.data.clone();
+                            board.insert(space, Space::Desert(tile));
+                            let candidate = State::new(board);
+                            let (camel_counts, desert_counts) =
+                                candidate.simulate_outcomes_fast(remaining_ref);
+                            let hits = desert_counts.get(&space).copied().unwrap_or(0usize);
+                            let scenarios = camel_counts
+                                .values()
+                                .next()
+                                .map(|positions| positions.iter().sum())
+                                .unwrap_or(0);
+                            evaluated.push((space, tile, hits, scenarios));
+                        }
+                        evaluated
+                    })
+                })
+                .collect();
+            handles
+                .into_iter()
+                .flat_map(|handle| match handle.join() {
+                    Ok(values) => values,
+                    Err(panic) => std::panic::resume_unwind(panic),
+                })
+                .collect()
+        });
+
+        for (space, tile, hits, scenarios) in evaluated {
+            if total == 0 {
+                total = scenarios;
             }
+            result.entry(space).or_default().insert(tile, hits);
         }
 
         (result, total)
+    }
+}
+
+#[cfg(test)]
+mod fast_simulator_tests {
+    use super::*;
+
+    /// The pre-optimisation implementation, kept as an oracle for the
+    /// allocation-light simulator. It uses `move_multiple_units` and a fresh
+    /// full `State` for every scenario, exactly as the old `simulate_outcomes`
+    /// did.
+    fn reference_outcomes(
+        state: &State,
+        already_moved: &[Camel],
+    ) -> (BTreeMap<Camel, Vec<usize>>, BTreeMap<u8, usize>) {
+        use crate::combinatorics::{Permutations, Product};
+
+        let remaining: Vec<Camel> = CAMEL_ORDER
+            .iter()
+            .copied()
+            .filter(|camel| !already_moved.contains(camel))
+            .collect();
+        let choices = vec![1u8, 2, 3];
+        let mut counts: BTreeMap<Camel, Vec<usize>> = CAMEL_ORDER
+            .iter()
+            .map(|&camel| (camel, vec![0usize; CAMEL_ORDER.len()]))
+            .collect();
+        let mut desert_counts = BTreeMap::new();
+
+        for perm in Permutations::new(remaining.clone()) {
+            for dice in Product::new(choices.clone(), remaining.len()) {
+                let (end, hits) =
+                    state.move_multiple_units(perm.iter().copied().zip(dice.iter().copied()));
+                for (position, &camel) in end.ranking().iter().enumerate() {
+                    counts.get_mut(&camel).unwrap()[position] += 1;
+                }
+                for (space, count) in hits {
+                    *desert_counts.entry(space).or_insert(0) += count;
+                }
+            }
+        }
+        (counts, desert_counts)
+    }
+
+    fn reference_expected_income(
+        state: &State,
+        already_moved: &[Camel],
+    ) -> BTreeMap<u8, BTreeMap<DesertTile, f64>> {
+        let mut hits: BTreeMap<u8, BTreeMap<DesertTile, usize>> = BTreeMap::new();
+        let mut total = 0usize;
+        for space in state.legal_desert_spaces() {
+            for &tile in &[DesertTile::Oasis, DesertTile::Mirage] {
+                let mut board = state.data.clone();
+                board.insert(space, Space::Desert(tile));
+                let (counts, desert_counts) = reference_outcomes(&State::new(board), already_moved);
+                if total == 0 {
+                    total = counts.values().next().map(|v| v.iter().sum()).unwrap_or(0);
+                }
+                let count = desert_counts.get(&space).copied().unwrap_or(0);
+                hits.entry(space).or_default().insert(tile, count);
+            }
+        }
+        if total == 0 {
+            return BTreeMap::new();
+        }
+        hits.into_iter()
+            .map(|(space, per_tile)| {
+                (
+                    space,
+                    per_tile
+                        .into_iter()
+                        .map(|(tile, count)| (tile, count as f64 / total as f64))
+                        .collect(),
+                )
+            })
+            .collect()
+    }
+
+    fn state(stacks: &[(u8, Vec<Camel>)], deserts: &[(u8, DesertTile)]) -> State {
+        let mut data = BTreeMap::new();
+        for &(space, ref camels) in stacks {
+            data.insert(space, Space::Camels(camels.clone()));
+        }
+        for &(space, tile) in deserts {
+            data.insert(space, Space::Desert(tile));
+        }
+        State::new(data)
+    }
+
+    fn simple_board() -> State {
+        state(
+            &[
+                (2, vec![Camel::Yellow]),
+                (3, vec![Camel::Orange]),
+                (5, vec![Camel::White]),
+                (7, vec![Camel::Green]),
+                (9, vec![Camel::Blue]),
+            ],
+            &[],
+        )
+    }
+
+    /// Stacks matter: a lower camel carries the ones above it, and a desert can
+    /// move the whole unit before the upper camel's own die is revealed.
+    fn stacked_board() -> State {
+        state(
+            &[
+                (5, vec![Camel::White, Camel::Yellow, Camel::Orange]),
+                (8, vec![Camel::Green]),
+                (11, vec![Camel::Blue]),
+            ],
+            &[(6, DesertTile::Oasis), (10, DesertTile::Mirage)],
+        )
+    }
+
+    fn near_finish_board() -> State {
+        state(
+            &[
+                (12, vec![Camel::White]),
+                (13, vec![Camel::Yellow]),
+                (14, vec![Camel::Orange, Camel::Green]),
+                (15, vec![Camel::Blue]),
+            ],
+            &[(16, DesertTile::Oasis)],
+        )
+    }
+
+    #[test]
+    fn fast_outcomes_match_reference_on_simple_board() {
+        let board = simple_board();
+        assert_eq!(
+            board.simulate_outcomes(&[]).0,
+            reference_outcomes(&board, &[]).0
+        );
+        assert_eq!(
+            board.simulate_outcomes(&[]).1,
+            reference_outcomes(&board, &[]).1
+        );
+    }
+
+    #[test]
+    fn fast_outcomes_match_reference_with_stacks_and_deserts() {
+        let board = stacked_board();
+        let expected = reference_outcomes(&board, &[]);
+        let actual = board.simulate_outcomes(&[]);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn fast_outcomes_match_reference_with_partial_legs() {
+        let board = stacked_board();
+        for already_moved in [
+            vec![Camel::White],
+            vec![Camel::White, Camel::Yellow],
+            vec![Camel::Blue, Camel::Green],
+        ] {
+            assert_eq!(
+                board.simulate_outcomes(&already_moved),
+                reference_outcomes(&board, &already_moved),
+                "already_moved = {already_moved:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn fast_outcomes_match_reference_near_the_finish() {
+        let board = near_finish_board();
+        assert_eq!(
+            board.simulate_outcomes(&[]),
+            reference_outcomes(&board, &[])
+        );
+    }
+
+    /// A mirage can push a stacked unit backwards so its upper camel lands on
+    /// the same tile twice. A simplified "one landing per camel" shortcut gets
+    /// this wrong; the full scenario simulation must not.
+    fn mirage_board() -> State {
+        state(
+            &[
+                (2, vec![Camel::Orange]),
+                (5, vec![Camel::White, Camel::Yellow]),
+                (9, vec![Camel::Green]),
+                (12, vec![Camel::Blue]),
+            ],
+            &[(7, DesertTile::Mirage)],
+        )
+    }
+
+    #[test]
+    fn mirage_carries_a_stacked_camel_back_onto_the_tile() {
+        let board = mirage_board();
+        assert_eq!(
+            board.simulate_outcomes(&[]),
+            reference_outcomes(&board, &[])
+        );
+    }
+
+    #[test]
+    fn parallel_desert_options_match_the_reference_on_stacked_boards() {
+        // Two dice left keeps the oracle cheap while still exercising every
+        // candidate, including the oasis on 16 in the near-finish board.
+        let already_moved = [Camel::White, Camel::Yellow, Camel::Orange];
+        for board in [
+            simple_board(),
+            stacked_board(),
+            near_finish_board(),
+            mirage_board(),
+        ] {
+            assert_eq!(
+                board.expected_desert_income(&already_moved),
+                reference_expected_income(&board, &already_moved),
+            );
+        }
+    }
+
+    #[test]
+    fn fast_move_hits_match_move_multiple_units() {
+        let board = stacked_board();
+        let moves = [
+            (Camel::White, 2u8),
+            (Camel::Yellow, 1),
+            (Camel::Green, 3),
+            (Camel::Blue, 2),
+            (Camel::Orange, 1),
+        ];
+        let (_, expected) = board.move_multiple_units(moves);
+        assert_eq!(board.simulate_moves_hits(moves), expected);
     }
 }

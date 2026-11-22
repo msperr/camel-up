@@ -418,7 +418,7 @@ fn desert_income_partial_board(
                 .into_iter()
                 .map(|camel| (camel, (rng.below(3) + 1) as u8));
 
-            let (_, hit_counts) = State::new(board).move_multiple_units(moves);
+            let hit_counts = State::new(board).simulate_moves_hits(moves);
             if hit_counts.contains_key(&space) {
                 *hits.entry(key).or_insert(0) += 1;
             }
