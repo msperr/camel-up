@@ -37,7 +37,7 @@ export type CamelOdds = {
 };
 
 export type CockpitResponse = {
-  readonly dice: { readonly expectedCoins: number };
+  readonly dice: { readonly expectedCoins: number | null };
   readonly legBet: {
     readonly available: boolean;
     readonly camels: readonly CamelOdds[];

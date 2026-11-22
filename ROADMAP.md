@@ -261,10 +261,13 @@ Features
   setup dice without coins, then suppress leg-bet values until setup is complete
   and the board is fully placed.~~
 - **Status:** Resolved on `feat/setup-round`. The app marks snapshots taken
-  before the first leg with `setupRound`; the cockpit then returns
-  `legBet.available: false` with blank odds and the board's cards are disabled.
-  Setup ends when the first leg starts with *Next round*. The backend still
-  simulates partial boards for callers that do not mark a snapshot as setup.
+  before the first leg with `setupRound`; the cockpit then marks both actions
+  unavailable (`legBet.available: false`, `dice.expectedCoins: null`) with blank
+  odds and the board's cards are disabled. Setup ends when the first leg starts
+  with *Next round*. The backend marks both actions unavailable after five dice
+  or at race finish, while still returning final ranking values for display.
+  It still simulates partial boards for callers that do not mark a snapshot as
+  setup.
 
 ### F-10 — Visual disabled state for exhausted board cards — P2
 

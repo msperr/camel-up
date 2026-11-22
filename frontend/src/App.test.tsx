@@ -791,7 +791,7 @@ describe("App", () => {
       expect(getBetCards(container)).toHaveLength(15);
     }, 20000);
 
-    it("resets all stacks when Clear is pressed, even if only a card was taken", () => {
+    it("resets all stacks when Clear is pressed, even if only a card was taken", async () => {
       const { container } = render(<App />);
       completeSetup();
       const clear = screen.getByRole("button", { name: "Clear" });
@@ -809,6 +809,15 @@ describe("App", () => {
         "true",
       );
       expect(clear).toBeDisabled();
+      await waitFor(() => {
+        const lastCall = vi.mocked(fetch).mock.calls.at(-1);
+        const body = JSON.parse(lastCall?.[1]?.body as string) as { setupRound: boolean };
+        expect(body.setupRound).toBe(true);
+      });
+      expect(container.querySelector('[data-action="legBet"]')).toHaveAttribute(
+        "data-leg-bet-available",
+        "false",
+      );
     });
 
     it("resets all stacks when Next round is pressed", () => {
@@ -828,7 +837,7 @@ describe("App", () => {
       expect(
         screen.getByRole("button", { name: "Take Orange 5 leg-bet tile" }),
       ).toBeInTheDocument();
-    }, 20000);
+    });
   });
 
   it("renders the cockpit below the board and refreshes it when a die is added", async () => {
@@ -857,13 +866,31 @@ describe("App", () => {
     expect(body.setupRound).toBe(true);
   });
 
+  it("shows both cockpit placeholders during setup", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockClear();
+    const { container } = render(<App />);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+
+    expect(container.querySelector('[data-action="dice"] [data-expected-coins]')).toHaveTextContent(
+      "—",
+    );
+    expect(container.querySelector('[data-action="legBet"]')).toHaveAttribute(
+      "data-leg-bet-available",
+      "false",
+    );
+  });
+
   it("shows leg bets as available once the setup round is over", async () => {
     const { container } = render(<App />);
     completeSetup();
 
-    expect(container.querySelector('[data-action="legBet"]')).toHaveAttribute(
-      "data-leg-bet-available",
-      "true",
+    await waitFor(() =>
+      expect(container.querySelector('[data-action="legBet"]')).toHaveAttribute(
+        "data-leg-bet-available",
+        "true",
+      ),
     );
     const fetchMock = vi.mocked(fetch);
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
@@ -917,7 +944,7 @@ describe("App", () => {
 
     addDie("white", "2");
 
-    expect(ticketValue()).toBeEmptyDOMElement();
+    expect(ticketValue()).toHaveTextContent("—");
     resolvePending(evaluation);
     await waitFor(() => expect(ticketValue()).toHaveTextContent("1.00"));
   });

@@ -34,8 +34,9 @@ Single-page TypeScript frontend for the Camel Up decision tracker.
 - Below the board, a read-only cockpit lists the four actions using their names
   from RULES.md. “Take a pyramid ticket and roll” shows the ticket's guaranteed
   +1 EP with no camel columns while a ticket can still be taken; it shows a dash
-  once all five dice are thrown or the race has finished. “Take a leg-betting
-  tile” is a dash during setup; in a leg it shows one cell per camel with net
+  during setup, once all five dice are thrown, or when the race has finished.
+  “Take a leg-betting tile” is a dash whenever taking a tile is unavailable
+  (setup, five dice, or race finish); in a leg it shows one cell per camel with net
   expected EP (two decimals) and the probability of winning the round (whole
   percent), ordered by expected coins, then probability, then colour; an
   exhausted stack is blank and sorted last. The desert and overall bet rows are
@@ -45,8 +46,9 @@ Single-page TypeScript frontend for the Camel Up decision tracker.
   `npm run dev`. Camel positions remain temporary local UI state for driving
   the SVG; the Rust crate remains the authoritative rules model. It rejects
   board/dice combinations that cannot occur, marks setup snapshots with
-  `setupRound` to suppress leg-bet values, and averages over the setup stack
-  orders left open by RULES.md section 3 for other callers.
+  `setupRound` to suppress both actions' values, marks both actions unavailable
+  after five dice or at race finish, and averages over the setup stack orders
+  left open by RULES.md section 3 for other callers.
 - Values are cleared while a new snapshot is being evaluated, so they never
   describe a different board. A validation failure shows the backend's message;
   only a network failure shows the instruction to start the Rust backend.

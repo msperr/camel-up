@@ -17,8 +17,9 @@
 //!
 //! During the setup round (RULES.md section 3) the five dice only place the
 //! camels and no leg bet may be taken. A snapshot marked `setupRound` therefore
-//! reports leg bets as unavailable and returns no leg-bet values, even though
-//! its partial-board probabilities can still be simulated for other callers.
+//! reports both the ticket and leg-bet actions as unavailable and returns no
+//! values for either, even though its partial-board probabilities can still be
+//! simulated for other callers.
 //!
 //! Snapshots must be internally consistent: every camel named in `thrownDice`
 //! must be on the board, and before all five camels are placed each camel on
@@ -106,14 +107,18 @@ pub struct CockpitResponse {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DiceAction {
-    pub expected_coins: f64,
+    /// `None` when taking a pyramid ticket is not an available action: during
+    /// setup, after all five dice are thrown, or once the race is finished.
+    pub expected_coins: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LegBetAction {
-    /// `false` during setup, when leg bets cannot be taken. The values are then
-    /// blank as well, so no coin expectation is shown for an illegal action.
+    /// Whether taking a leg-betting tile is an available action: `false`
+    /// during setup, after all five dice are thrown, and once the race is
+    /// finished. Camel values are still listed for final-ranking display; the
+    /// cockpit suppresses them while this flag is `false`.
     pub available: bool,
     /// Already sorted by expected coins, then `p1`, then colour; exhausted
     /// stacks come last.
@@ -127,8 +132,9 @@ pub struct CamelOdds {
     /// Net expected EP of taking this colour's top leg-betting tile.
     pub expected_coins: Option<f64>,
     /// `p1`: probability of being 1st at the end of the current leg. Present
-    /// even when the colour has no leg-betting tile left; `None` only when the
-    /// board has no evaluable outcomes.
+    /// even when the colour has no leg-betting tile left or the leg is over;
+    /// `None` only when the board has no evaluable outcomes or values are
+    /// suppressed during the setup round.
     pub round_win_probability: Option<f64>,
 }
 
@@ -138,12 +144,19 @@ pub fn evaluate_cockpit(request: &CockpitRequest) -> Result<CockpitResponse, Str
     let state = build_state(request)?;
     validate_snapshot(request, &state)?;
 
-    // Setup dice only place the camels: no leg-betting tile may be taken and
-    // there is no leg to score yet, so suppress every leg-bet value.
+    // Both ticket and leg-bet actions are unavailable during setup, after the
+    // fifth die of a leg, and once the race is over. Ranking values are still
+    // computed after a leg ends so final standings can be displayed.
+    let actions_available = !request.setup_round
+        && !state.is_finished()
+        && request.thrown_dice.len() < CAMEL_ORDER.len();
+
+    // Setup dice only place the camels: there is no leg to score yet, so emit
+    // neither a ticket value nor any leg-bet value.
     if request.setup_round {
         return Ok(CockpitResponse {
             dice: DiceAction {
-                expected_coins: PYRAMID_TICKET_EP,
+                expected_coins: None,
             },
             leg_bet: LegBetAction {
                 available: false,
@@ -218,10 +231,10 @@ pub fn evaluate_cockpit(request: &CockpitRequest) -> Result<CockpitResponse, Str
 
     Ok(CockpitResponse {
         dice: DiceAction {
-            expected_coins: PYRAMID_TICKET_EP,
+            expected_coins: actions_available.then_some(PYRAMID_TICKET_EP),
         },
         leg_bet: LegBetAction {
-            available: true,
+            available: actions_available,
             camels,
         },
     })

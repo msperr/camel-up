@@ -888,12 +888,7 @@ export default function App() {
             </div>
           </div>
 
-          <Cockpit
-            evaluation={cockpit}
-            error={cockpitError}
-            diceAvailable={canAddDie}
-            legBetAvailable={canTakeLegBet}
-          />
+          <Cockpit evaluation={cockpit} error={cockpitError} diceAvailable={canAddDie} />
 
           <div className="dice-controls" data-dice-controls="true">
             <button

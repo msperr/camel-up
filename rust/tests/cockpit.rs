@@ -164,7 +164,7 @@ fn dice_ticket_is_worth_one_and_empty_board_is_blank() {
 
     let result = evaluate_cockpit(&snapshot).expect("valid snapshot");
 
-    assert_eq!(result.dice.expected_coins, 1.0);
+    assert_eq!(result.dice.expected_coins, Some(1.0));
     assert!(result
         .leg_bet
         .camels
@@ -183,8 +183,8 @@ fn setup_round_suppresses_leg_bet_values() {
 
     let result = evaluate_cockpit(&snapshot).expect("valid setup snapshot");
 
-    // The setup dice only place the camels: no leg bet can be taken yet.
-    assert_eq!(result.dice.expected_coins, 1.0);
+    // The setup dice only place the camels: neither action can be taken yet.
+    assert_eq!(result.dice.expected_coins, None);
     assert!(!result.leg_bet.available);
     assert_eq!(
         colors(&result),
@@ -229,11 +229,44 @@ async fn http_endpoint_marks_setup_leg_bets_unavailable() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let value: Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(value["legBet"]["available"], false);
+    assert!(value["dice"]["expectedCoins"].is_null());
     let camels = value["legBet"]["camels"].as_array().unwrap();
     assert_eq!(camels.len(), 5);
     assert!(camels
         .iter()
         .all(|camel| camel["expectedCoins"].is_null() && camel["roundWinProbability"].is_null()));
+}
+
+#[test]
+fn actions_unavailable_after_five_dice_and_at_race_finish() {
+    let five_dice = request(json!({
+        "stacks": {
+            "1": ["blue"], "4": ["green"], "8": ["orange"],
+            "11": ["yellow"], "15": ["white"]
+        },
+        "thrownDice": ["white", "yellow", "orange", "green", "blue"],
+        "availableLegBets": all_tiles(5),
+    }));
+
+    let result = evaluate_cockpit(&five_dice).expect("valid snapshot");
+    assert!(!result.leg_bet.available);
+    assert_eq!(result.dice.expected_coins, None);
+    // Final standings are still reported for display.
+    assert_eq!(
+        odds(&result, CamelColor::White).round_win_probability,
+        Some(1.0)
+    );
+
+    let finished = request(json!({
+        "stacks": { "2": ["white"], "5": ["yellow"], "9": ["green"], "12": ["orange"] },
+        "finished": ["blue"],
+        "thrownDice": ["white", "yellow", "green", "orange"],
+        "availableLegBets": all_tiles(5),
+    }));
+
+    let result = evaluate_cockpit(&finished).expect("valid snapshot");
+    assert!(!result.leg_bet.available);
+    assert_eq!(result.dice.expected_coins, None);
 }
 
 #[test]
