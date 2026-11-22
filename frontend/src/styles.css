@@ -242,6 +242,18 @@ body {
   box-shadow: 0 8px 20px rgba(91, 53, 32, 0.16);
 }
 
+.cockpit-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 6px 8px;
+  color: #8b2c1d;
+  background: #fff1ea;
+  border: 1px solid #d99b82;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
 .cockpit-row {
   display: grid;
   grid-template-columns: minmax(12rem, 1fr) auto;

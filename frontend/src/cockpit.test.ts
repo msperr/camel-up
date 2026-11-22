@@ -92,11 +92,33 @@ describe("fetchCockpitEvaluation", () => {
     expect(vi.mocked(fetch).mock.calls[0][1]).toMatchObject({ signal: controller.signal });
   });
 
-  it("rejects a failed response", async () => {
+  it("reports a failed response with backend startup instructions", async () => {
     vi.mocked(fetch).mockResolvedValueOnce({ ok: false, status: 500 } as Response);
 
     await expect(
       fetchCockpitEvaluation(buildCockpitRequest([], createRaceState(), createLegBetState())),
-    ).rejects.toThrow("Cockpit evaluation failed: 500");
+    ).rejects.toThrow(/cannot reach the Rust backend at http:\/\/127\.0\.0\.1:3000[\s\S]*HTTP 500/);
+  });
+
+  it("wraps a network failure with backend startup instructions", async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    await expect(
+      fetchCockpitEvaluation(buildCockpitRequest([], createRaceState(), createLegBetState())),
+    ).rejects.toThrow(/Start it with 'cd rust && cargo run'/);
+  });
+
+  it("does not wrap an aborted request", async () => {
+    const abortError = new Error("aborted");
+    vi.mocked(fetch).mockRejectedValueOnce(abortError);
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      fetchCockpitEvaluation(
+        buildCockpitRequest([], createRaceState(), createLegBetState()),
+        controller.signal,
+      ),
+    ).rejects.toBe(abortError);
   });
 });

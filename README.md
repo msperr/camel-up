@@ -67,14 +67,20 @@ light central panel, with small numbers on the inner edges and a centred 3 x 1
 tray with five dice slots. The tray's plus button opens an add-die dialog; each
 thrown die moves a coloured camel meeple onto the field, with camel-unit
 stacking and a finish-line overflow area. Clear removes dice and camels, while
-Next round clears only the dice once all five are on the field. Camel positions
-are local UI state; there is no backend connection yet. See
+Next round clears only the dice once all five are on the field. The read-only
+cockpit below the board gets its probabilities and expected coins from the Rust
+backend; camel positions remain local UI state. See
 [frontend/README.md](frontend/README.md).
 
 ```sh
+# terminal 1: backend API on http://127.0.0.1:3000
+cd rust
+cargo run
+
+# terminal 2: frontend on http://127.0.0.1:5173 (proxies /api to the backend)
 cd frontend
 npm install
-npm run dev       # development server
+npm run dev -- --host 127.0.0.1
 npm run build     # type-check and production build
 npm test          # unit and component tests
 ```

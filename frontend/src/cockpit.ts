@@ -11,6 +11,10 @@ import { getLegBetValues, type LegBetState } from "./legBets";
 
 const COCKPIT_PATH = "/api/cockpit/actions";
 
+const BACKEND_UNAVAILABLE_MESSAGE =
+  "Cockpit evaluation failed: cannot reach the Rust backend at http://127.0.0.1:3000. " +
+  "Start it with 'cd rust && cargo run', then reload.";
+
 export type ThrownDie = {
   readonly color: CamelColor;
   readonly value: DieValue;
@@ -65,16 +69,25 @@ export const fetchCockpitEvaluation = async (
   request: CockpitRequest,
   signal?: AbortSignal,
 ): Promise<CockpitResponse> => {
-  const response = await fetch(COCKPIT_PATH, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request),
-    signal,
-  });
+  try {
+    const response = await fetch(COCKPIT_PATH, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+      signal,
+    });
 
-  if (!response.ok) {
-    throw new Error(`Cockpit evaluation failed: ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    return (await response.json()) as CockpitResponse;
+  } catch (error) {
+    if (signal?.aborted) {
+      throw error;
+    }
+
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`${BACKEND_UNAVAILABLE_MESSAGE} Details: ${detail}`, { cause: error });
   }
-
-  return (await response.json()) as CockpitResponse;
 };

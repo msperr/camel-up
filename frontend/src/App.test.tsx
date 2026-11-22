@@ -829,4 +829,12 @@ describe("App", () => {
     expect(body.thrownDice).toEqual(["white"]);
     expect(body.stacks).toEqual({ "2": ["white"] });
   });
+
+  it("shows the cockpit backend error when the evaluation request fails", async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    const { container } = render(<App />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Rust backend/);
+    expect(container.querySelectorAll("[data-cockpit-camel]")).toHaveLength(5);
+  });
 });

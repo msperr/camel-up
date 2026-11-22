@@ -324,6 +324,7 @@ export default function App() {
   const [race, setRace] = useState<RaceState>(createRaceState);
   const [legBets, setLegBets] = useState<LegBetState>(createLegBetState);
   const [cockpit, setCockpit] = useState<CockpitResponse | null>(null);
+  const [cockpitError, setCockpitError] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedColor, setSelectedColor] = useState<CamelColor | "">("");
   const [selectedValue, setSelectedValue] = useState<DieValue | "">("");
@@ -450,14 +451,20 @@ export default function App() {
   useEffect(() => {
     const controller = new AbortController();
 
+    setCockpitError(null);
+
     fetchCockpitEvaluation(buildCockpitRequest(dice, race, legBets), controller.signal)
-      .then(setCockpit)
+      .then((evaluation) => {
+        setCockpit(evaluation);
+        setCockpitError(null);
+      })
       .catch((error: unknown) => {
         if (controller.signal.aborted) {
           return;
         }
         console.error("Could not evaluate cockpit actions", error);
         setCockpit(null);
+        setCockpitError(error instanceof Error ? error.message : String(error));
       });
 
     return () => controller.abort();
@@ -873,7 +880,7 @@ export default function App() {
             </div>
           </div>
 
-          <Cockpit evaluation={cockpit} />
+          <Cockpit evaluation={cockpit} error={cockpitError} />
 
           <div className="dice-controls" data-dice-controls="true">
             <button

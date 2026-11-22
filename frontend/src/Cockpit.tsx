@@ -1,7 +1,9 @@
-import type { CockpitResponse } from "./cockpit";
+import { CAMEL_COLORS } from "./camelRace";
+import type { CamelOdds, CockpitResponse } from "./cockpit";
 
 type CockpitProps = {
   readonly evaluation: CockpitResponse | null;
+  readonly error: string | null;
 };
 
 const formatCoins = (coins: number | null): string => (coins === null ? "" : coins.toFixed(2));
@@ -9,18 +11,40 @@ const formatCoins = (coins: number | null): string => (coins === null ? "" : coi
 const formatProbability = (probability: number | null): string =>
   probability === null ? "" : `${Math.round(probability * 100)}%`;
 
+const blankCamel = (color: (typeof CAMEL_COLORS)[number]): CamelOdds => ({
+  color,
+  expectedCoins: null,
+  roundWinProbability: null,
+});
+
+const camelsForEvaluation = (evaluation: CockpitResponse | null): readonly CamelOdds[] => {
+  const fromApi = evaluation?.legBet.camels ?? [];
+  const present = new Set(fromApi.map(({ color }) => color));
+  const missing = CAMEL_COLORS.filter((color) => !present.has(color)).map(blankCamel);
+
+  return [...fromApi, ...missing];
+};
+
 /**
  * Read-only action overview below the board.
  *
  * Row labels are the action names from RULES.md sections 5 to 8. Only the
  * pyramid-ticket roll and the leg-betting tile are evaluated; the desert and
- * overall-bet rows are placeholders.
+ * overall-bet rows are placeholders. The leg-betting values come from the Rust
+ * backend, so an unavailable backend is reported here instead of silently
+ * removing the camel columns.
  */
-export default function Cockpit({ evaluation }: CockpitProps) {
-  const camels = evaluation?.legBet.camels ?? [];
+export default function Cockpit({ evaluation, error }: CockpitProps) {
+  const camels = camelsForEvaluation(evaluation);
 
   return (
     <section className="cockpit" aria-label="Actions" data-cockpit="true">
+      {error && (
+        <p className="cockpit-error" role="alert" data-cockpit-error>
+          {error}
+        </p>
+      )}
+
       <div className="cockpit-row" data-action="dice">
         <span className="cockpit-label">Take a pyramid ticket and roll</span>
         <span className="cockpit-value" data-expected-coins>
